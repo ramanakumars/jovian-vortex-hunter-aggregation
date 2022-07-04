@@ -1,0 +1,15 @@
+T0.instruction: Please draw an ellipse around each vortex in this image. Use the tools
+    below to differentiate the color at the center of the vortex.
+T0.tools.0.label: Red/orange vortex
+T0.tools.1.label: White vortex
+T0.tools.2.label: Brown vortex
+T0.tools.3.label: Dark vortex (hole)
+T0.tools.4.details.0.answers.0.label: White
+T0.tools.4.details.0.answers.1.label: Red/orange
+T0.tools.4.details.0.answers.2.label: Brown
+T0.tools.4.details.0.question: What is the color at the center?
+T0.tools.4.details.1.answers.0.label: White
+T0.tools.4.details.1.answers.1.label: Red/orange
+T0.tools.4.details.1.answers.2.label: Brown
+T0.tools.4.details.1.question: 'What is the color on the edge? '
+T0.tools.4.label: Multi color

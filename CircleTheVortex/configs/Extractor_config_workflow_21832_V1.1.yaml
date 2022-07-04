@@ -1,0 +1,16 @@
+extractor_config:
+    shape_extractor_ellipse:
+    -   details:
+            T0_tool4:
+            - question_extractor
+            - question_extractor
+        shape: ellipse
+        task: T0
+        tools:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+workflow_id: 21832
+workflow_version: '1.1'

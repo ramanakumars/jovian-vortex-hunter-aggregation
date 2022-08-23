@@ -10,6 +10,16 @@ from skimage import io
 from shapely.geometry import Polygon, Point
 from shapely import affinity
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
 def get_subject_image(subject): 
     # get the subject metadata from Panoptes
     subjecti = Subject(int(subject))
@@ -79,18 +89,23 @@ def string_to_np_array(data):
 
 
 class Aggregator:
-    def __init__(self, reduction_data):
+    def __init__(self, reduction_data=None):
+        if reduction_data is None:
+            return
+
         self.data = ascii.read(reduction_data, format='csv')
 
-        subjects = np.unique(self.data['subject_id'])
+        sub_ids  = np.asarray(self.data['subject_id'])
+        subjects = np.unique(sub_ids)
 
         self.JSON_data = []
 
         for subject in tqdm.tqdm(subjects):
-            dark_ext, dark_clust   = self.get_ellipse_data(subject, 'dark')
-            white_ext, white_clust = self.get_ellipse_data(subject, 'white')
-            red_ext, red_clust     = self.get_ellipse_data(subject, 'red')
-            brown_ext, brown_clust = self.get_ellipse_data(subject, 'brown')
+            datasub = self.data[np.where(sub_ids==subject)[0]]
+            dark_ext, dark_clust   = self.get_ellipse_data(subject, 'dark', datasub)
+            white_ext, white_clust = self.get_ellipse_data(subject, 'white', datasub)
+            red_ext, red_clust     = self.get_ellipse_data(subject, 'red', datasub)
+            brown_ext, brown_clust = self.get_ellipse_data(subject, 'brown', datasub)
 
             row = {'subject_id': subject, 
                    'dark_extracts': dark_ext, 'dark_clusters': dark_clust,
@@ -101,8 +116,21 @@ class Aggregator:
 
             self.JSON_data.append(row)
 
+    @classmethod
+    def from_JSON(cls, JSONfile):
+        obj = cls(None)
 
-    def get_ellipse_data(self, subject, vort_type):
+        with open(JSONfile, 'r') as indata:
+            obj.JSON_data = json.load(indata)
+
+        return obj
+    
+    def save_JSON(self, outfile):
+        with open(outfile, 'w') as outJSON:
+            json.dump(self.JSON_data, outJSON, cls=NpEncoder)
+        print(f"Saved to {outfile}")
+
+    def get_ellipse_data(self, subject, vort_type, data=None):
         '''
         data = {}
         data['dark']  = self.dark_vortex_data[self.dark_vortex_data['subject_id']==subject]
@@ -111,7 +139,8 @@ class Aggregator:
         data['brown'] = self.brown_vortex_data[self.brown_vortex_data['subject_id']==subject]
         '''
 
-        data = self.data[(self.data['subject_id']==subject)]#&(self.data['reducer_key']==f'{vort_type}-vortex-cluster')]
+        if data is None:
+            data = self.data[(self.data['subject_id']==subject)]#&(self.data['reducer_key']==f'{vort_type}-vortex-cluster')]
 
         toolID = {'dark': 3, 'red': 0, 'white': 1, 'brown': 2}
 
@@ -140,7 +169,7 @@ class Aggregator:
 
         return ext_data, clust_data
 
-    def plot_subject(self, subject, ax=None, keys=['dark', 'red', 'white', 'brown']):
+    def plot_subject(self, subject, ax=None, keys=['dark', 'red', 'white', 'brown'], sigmacut=None):
 
         colors = {'dark': 'k', 'red': 'r', 'white': 'white', 'brown': 'brown'}
 
@@ -164,6 +193,11 @@ class Aggregator:
 
             for vals in zip(clusti['x'], clusti['y'], clusti['rx'], clusti['ry'], clusti['angle'], clusti['sigma']):
                 params = vals[:-1]
+                
+                if sigmacut is not None:
+                    if vals[-1] > sigmacut:
+                        continue
+                
                 ellr = params_to_shape(params)
 
                 try:
@@ -174,7 +208,7 @@ class Aggregator:
                     x_m, y_m = avg_minus.exterior.xy
                     x_p, y_p = avg_plus.exterior.xy
 
-                    #ax.fill(np.append(x_p, x_m[::-1]), np.append(y_p, y_m[::-1]), color=colors[key], alpha=0.2)
+                    ax.fill(np.append(x_p, x_m[::-1]), np.append(y_p, y_m[::-1]), color=colors[key], alpha=0.2)
                 except ValueError:
                     pass
                 ax.plot(*ellr.exterior.xy, '-', color=colors[key], linewidth=1)

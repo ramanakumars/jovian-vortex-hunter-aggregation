@@ -37,7 +37,7 @@ def string_to_np_array(data):
 
 
 class Aggregator:
-    def __init__(self, reduction_data=None):
+    def __init__(self, reduction_data=None, autoload=True):
         if reduction_data is None:
             return
 
@@ -48,24 +48,30 @@ class Aggregator:
 
         self.JSON_data = []
 
-        for subject in tqdm.tqdm(subjects):
-            datasub = self.data[np.where(sub_ids == subject)[0]]
-            dark_ext, dark_clust = self.get_ellipse_data(
-                subject, 'dark', datasub)
-            white_ext, white_clust = self.get_ellipse_data(
-                subject, 'white', datasub)
-            red_ext, red_clust = self.get_ellipse_data(subject, 'red', datasub)
-            brown_ext, brown_clust = self.get_ellipse_data(
-                subject, 'brown', datasub)
+        if autoload:
+            for subject in tqdm.tqdm(subjects):
+                datasub = self.data[np.where(sub_ids == subject)[0]]
+                dark_ext, dark_clust = self.get_ellipse_data(
+                    subject, 'dark', datasub)
+                white_ext, white_clust = self.get_ellipse_data(
+                    subject, 'white', datasub)
+                red_ext, red_clust = self.get_ellipse_data(
+                    subject, 'red', datasub)
+                brown_ext, brown_clust = self.get_ellipse_data(
+                    subject, 'brown', datasub)
 
-            row = {'subject_id': subject,
-                   'dark_extracts': dark_ext, 'dark_clusters': dark_clust,
-                   'white_extracts': white_ext, 'white_clusters': white_clust,
-                   'red_extracts': red_ext, 'red_clusters': red_clust,
-                   'brown_extracts': brown_ext, 'brown_clusters': brown_clust
-                   }
+                row = {'subject_id': subject,
+                       'dark_extracts': dark_ext,
+                       'dark_clusters': dark_clust,
+                       'white_extracts': white_ext,
+                       'white_clusters': white_clust,
+                       'red_extracts': red_ext,
+                       'red_clusters': red_clust,
+                       'brown_extracts': brown_ext,
+                       'brown_clusters': brown_clust
+                       }
 
-            self.JSON_data.append(row)
+                self.JSON_data.append(row)
 
     @classmethod
     def from_JSON(cls, JSONfile):
@@ -81,44 +87,46 @@ class Aggregator:
             json.dump(self.JSON_data, outJSON, cls=NpEncoder)
         print(f"Saved to {outfile}")
 
-    def get_ellipse_data(self, subject, vort_type, data=None):
+    def get_ellipse_data(self, subject, key, data=None):
         if data is None:
             data = self.data[(self.data['subject_id'] == subject)]
 
-        toolID = {'dark': 3, 'red': 0, 'white': 1, 'brown': 2}
+        toolID = {'dark': 3, 'red': 0, 'white': 1,
+                  'brown': 2, 'multi-color': 4}
+        subtaskID = {'white': 0, 'red': 1, 'brown': 2}
 
         clust_data = {}
         ext_data = {}
-        for j, key in enumerate(['dark', 'red', 'white', 'brown']):
-            toolIDi = toolID[key]
-            for subkey in ['x', 'y', 'rx', 'ry', 'angle']:
-                try:
-                    ext_data[subkey] = string_to_np_array(
-                        data[
-                            f'data.frame0.T0_tool{toolIDi}_ellipse_{subkey}'
-                        ][0])
-                except KeyError:
-                    ext_data[subkey] = []
 
-            for subkey in ['x', 'y', 'rx', 'ry', 'angle', 'sigma']:
-                try:
-                    clust_data[subkey] = string_to_np_array(
-                        data[
-                            f'data.frame0.T0_tool{toolIDi}_clusters_{subkey}'
-                        ][0])
-                except KeyError:
-                    clust_data[subkey] = []
-            for subkey in ['labels', 'probabilities']:
-                try:
-                    clust_data[subkey] = string_to_np_array(
-                        data[
-                            f'data.frame0.T0_tool{toolIDi}_cluster_{subkey}'
-                        ][0])
-                except KeyError:
-                    clust_data[subkey] = []
+        toolIDi = toolID[key]
+        for subkey in ['x', 'y', 'rx', 'ry', 'angle']:
+            try:
+                ext_data[subkey] = string_to_np_array(
+                    data[
+                        f'data.frame0.T0_tool{toolIDi}_ellipse_{subkey}'
+                    ][0])
+            except KeyError:
+                ext_data[subkey] = []
 
-            if clust_data['probabilities'] == []:
-                clust_data['probabilities'] = [1]*len(ext_data['x'])
+        for subkey in ['x', 'y', 'rx', 'ry', 'angle', 'sigma']:
+            try:
+                clust_data[subkey] = string_to_np_array(
+                    data[
+                        f'data.frame0.T0_tool{toolIDi}_clusters_{subkey}'
+                    ][0])
+            except KeyError:
+                clust_data[subkey] = []
+        for subkey in ['labels', 'probabilities']:
+            try:
+                clust_data[subkey] = string_to_np_array(
+                    data[
+                        f'data.frame0.T0_tool{toolIDi}_cluster_{subkey}'
+                    ][0])
+            except KeyError:
+                clust_data[subkey] = []
+
+        if clust_data['probabilities'] == []:
+            clust_data['probabilities'] = [1]*len(ext_data['x'])
 
         return ext_data, clust_data
 
@@ -162,7 +170,7 @@ class Aggregator:
 
                     ax.fill(np.append(
                         x_p, x_m[::-1]), np.append(y_p, y_m[::-1]),
-                            color=colors[key], alpha=0.2)
+                        color=colors[key], alpha=0.2)
                 except ValueError:
                     pass
                 ax.plot(*ellr.exterior.xy, '-', color=colors[key], linewidth=1)

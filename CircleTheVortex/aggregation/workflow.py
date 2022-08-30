@@ -6,7 +6,7 @@ import json
 import tqdm
 from panoptes_client import Subject
 from skimage import io
-from .vortex_cluster import get_sigma_shape, params_to_shape
+from .shape_funcs import get_sigma_shape, params_to_shape
 
 
 class NpEncoder(json.JSONEncoder):
@@ -44,12 +44,12 @@ class Aggregator:
         self.data = ascii.read(reduction_data, format='csv')
 
         sub_ids = np.asarray(self.data['subject_id'])
-        subjects = np.unique(sub_ids)
+        self.subjects = np.unique(sub_ids)
 
         self.JSON_data = []
 
         if autoload:
-            for subject in tqdm.tqdm(subjects):
+            for subject in tqdm.tqdm(self.subjects):
                 datasub = self.data[np.where(sub_ids == subject)[0]]
                 dark_ext, dark_clust = self.get_ellipse_data(
                     subject, 'dark', datasub)
@@ -79,6 +79,8 @@ class Aggregator:
 
         with open(JSONfile, 'r') as indata:
             obj.JSON_data = json.load(indata)
+        
+        obj.subjects = np.unique([d['subject_id'] for d in obj.JSON_data])
 
         return obj
 

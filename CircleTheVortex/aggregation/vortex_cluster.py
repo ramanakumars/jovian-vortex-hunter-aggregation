@@ -44,7 +44,7 @@ def cluster_vortices(ellipses):
                 # then we add this to the lone vortex bin
                 lone_ellipses.append(elli)
             else:
-                # if not, then we add all overlapping 
+                # if not, then we add all overlapping
                 # vortices to the group
                 ellipse_groups.append(ellipse_queue[delete_mask])
 

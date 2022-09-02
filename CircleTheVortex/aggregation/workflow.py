@@ -79,7 +79,7 @@ class Aggregator:
 
         with open(JSONfile, 'r') as indata:
             obj.JSON_data = json.load(indata)
-        
+
         obj.subjects = np.unique([d['subject_id'] for d in obj.JSON_data])
 
         return obj
@@ -95,7 +95,6 @@ class Aggregator:
 
         toolID = {'dark': 3, 'red': 0, 'white': 1,
                   'brown': 2, 'multi-color': 4}
-        subtaskID = {'white': 0, 'red': 1, 'brown': 2}
 
         clust_data = {}
         ext_data = {}

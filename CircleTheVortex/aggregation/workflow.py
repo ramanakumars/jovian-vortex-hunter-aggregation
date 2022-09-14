@@ -7,6 +7,7 @@ import tqdm
 from panoptes_client import Subject
 from skimage import io
 from .shape_funcs import get_sigma_shape, params_to_shape
+from .vortex_cluster import ExtractVortex, ClusterVortex
 
 
 class NpEncoder(json.JSONEncoder):
@@ -130,6 +131,80 @@ class Aggregator:
             clust_data['probabilities'] = [1]*len(ext_data['x'])
 
         return ext_data, clust_data
+
+    def get_ellipses(self, subject_data, sigma_cut=0.6):
+
+        PJs = {'white': [], 'red': [], 'brown': [], 'dark': []}
+        ellipses = {'white': [], 'red': [], 'brown': [], 'dark': []}
+
+        for key in ['white', 'red', 'brown', 'dark']:
+            extracts = filter(lambda d: (len(d[f'{key}_clusters']['x']) > 0),
+                              self.JSON_data)
+            extracts = filter(lambda d: (max(d[f'{key}_clusters']['sigma'])
+                                         < sigma_cut),
+                              extracts)
+            best_ids = np.asarray([x['subject_id'] for x in extracts])
+
+            for i, sub in enumerate(tqdm.tqdm(best_ids,
+                                              desc=f'{key} vortices')):
+                datai = next(
+                    filter(lambda d: d['subject_id'] == sub, self.JSON_data))
+                inds = np.where(np.asarray(
+                    datai[f'{key}_clusters']['sigma']) < 0.5)[0]
+
+                lon, lat, PJ = subject_data.get_meta(sub)
+
+                x0 = np.asarray(datai[f'{key}_clusters']['x'])[inds]
+                y0 = np.asarray(datai[f'{key}_clusters']['y'])[inds]
+
+                w = np.asarray(datai[f'{key}_clusters']['rx'])[inds]
+                h = np.asarray(datai[f'{key}_clusters']['ry'])[inds]
+                a = np.asarray(datai[f'{key}_clusters']['angle'])[inds]
+
+                sigma = np.asarray(datai[f'{key}_clusters']['sigma'])[inds]
+
+                ellipses_i = []
+                for i in range(len(x0)):
+                    pari = np.asarray([x0[i], y0[i], w[i], h[i], a[i]])
+
+                    ext_inds = np.where(np.asarray(
+                        datai[f'{key}_clusters']['labels']) == inds[i])[0]
+                    ext_x0 = np.asarray(
+                        datai[f'{key}_extracts']['x'])[ext_inds]
+                    ext_y0 = np.asarray(
+                        datai[f'{key}_extracts']['y'])[ext_inds]
+                    ext_w = np.asarray(
+                        datai[f'{key}_extracts']['rx'])[ext_inds]
+                    ext_h = np.asarray(
+                        datai[f'{key}_extracts']['ry'])[ext_inds]
+                    ext_a = np.asarray(
+                        datai[f'{key}_extracts']['angle'])[ext_inds]
+                    ext_prob = np.asarray(
+                        datai[f'{key}_clusters']
+                        ['probabilities'])[ext_inds]
+
+                    extracts = []
+                    for j in range(len(ext_x0)):
+                        pari = np.asarray([ext_x0[j], ext_y0[j], ext_w[j],
+                                           ext_h[j], ext_a[j]])
+                        ext_ellipse = ExtractVortex(pari, ext_prob[j],
+                                                    lon, lat)
+                        ext_ellipse.subject_id = sub
+                        extracts.append(ext_ellipse)
+
+                    elli = ClusterVortex(pari, sigma[i], lon, lat)
+                    elli.subject_id = sub
+                    elli.extracts = extracts
+
+                    ellipses_i.append(elli)
+
+                ellipses[key].extend(ellipses_i)
+                PJs[key].extend([PJ]*len(x0))
+
+            PJs[key] = np.asarray(PJs[key])
+            ellipses[key] = np.asarray(ellipses[key])
+
+        return PJs, ellipses
 
     def plot_subject(self, subject, ax=None,
                      keys=['dark', 'red', 'white', 'brown'], sigmacut=None):

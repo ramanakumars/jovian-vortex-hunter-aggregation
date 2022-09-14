@@ -55,3 +55,67 @@ def lonlat_to_pixel(lon, lat, lon0, lat0, x0=192, y0=192):
     y = dy + y0
 
     return x, y
+
+
+def vincenty(p1, p2, MAX_ITER=500):
+    '''
+        Calculates the vincenty distance between two
+        (lon, lat) pairs on Jupiter
+    '''
+
+    lon1, lat1 = np.radians(p1)
+    lon2, lat2 = np.radians(p2)
+
+    U1 = np.arctan((1 - flat) * np.tan(lat1))
+    U2 = np.arctan((1 - flat) * np.tan(lat2))
+
+    L = lon2 - lon1
+    lam = L
+
+    for _ in range(MAX_ITER):
+        sin_sigma = np.sqrt(
+            (np.cos(U1) * np.sin(lam))**2. +
+            (np.cos(U1) * np.sin(U2) - np.sin(U1) *
+             np.cos(U2) * np.cos(lam))**2.
+        )
+
+        cos_sigma = np.sin(U1) * np.sin(U2) + np.cos(U1) * \
+            np.cos(U2) * np.cos(lam)
+
+        sigma = np.arctan2(sin_sigma, cos_sigma)
+
+        sin_alpha = np.cos(U1) * np.cos(U2) * np.sin(lam) / np.sin(sigma)
+        cossq_alpha = 1. - sin_alpha**2.
+
+        cos_2sigm = np.cos(sigma) - 2. * np.sin(U1) * np.sin(U2) / cossq_alpha
+
+        C = (flat / 16.) * cossq_alpha * (4 + flat * (4 - 3 * cossq_alpha))
+
+        lam_new = L + (1 - C) * flat * sin_alpha *\
+            (sigma + C * sin_sigma * (cos_2sigm + C * cos_sigma *
+                                      (-1 + 2 * cos_2sigm**2.)
+                                      )
+             )
+
+        dlam = np.abs(lam - lam_new)
+
+        lam = lam_new
+
+        if dlam < 1.e-10:
+            break
+
+    u_sq = cossq_alpha * (re**2. - rp**2.) / (rp**2.)
+
+    A = 1. + u_sq / 16384 * (4096 + u_sq *
+                             (-768 + u_sq * (320 - 175 * u_sq))
+                             )
+    B = u_sq / 1024 * (256 + u_sq * (-128 + u_sq * (74 - 47 * u_sq)))
+
+    dsig = B * sin_sigma * (cos_2sigm + B / 4 *
+                            (cos_sigma * (-1 + 2 * cos_2sigm**2.) -
+                             (B / 6) * cos_2sigm * (-3 + 4 * sin_sigma**2.) *
+                                (-3 + 4 * cos_2sigm**2.))
+                            )
+    s = rp * A * (sigma - dsig)
+
+    return s, np.degrees(sigma)

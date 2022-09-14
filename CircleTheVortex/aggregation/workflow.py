@@ -6,8 +6,8 @@ import json
 import tqdm
 from panoptes_client import Subject
 from skimage import io
-from .shape_funcs import get_sigma_shape, params_to_shape
-from .vortex_cluster import ExtractVortex, ClusterVortex
+from .shape_utils import get_sigma_shape, params_to_shape
+from .vortex import ExtractVortex, ClusterVortex
 
 
 class NpEncoder(json.JSONEncoder):
@@ -190,11 +190,17 @@ class Aggregator:
                         ext_ellipse = ExtractVortex(pari, ext_prob[j],
                                                     lon, lat)
                         ext_ellipse.subject_id = sub
+                        ext_ellipse.perijove = PJ
+                        ext_ellipse.color = key
+
                         extracts.append(ext_ellipse)
 
                     elli = ClusterVortex(pari, sigma[i], lon, lat)
+
                     elli.subject_id = sub
                     elli.extracts = extracts
+                    elli.perijove = PJ
+                    elli.color = key
 
                     ellipses_i.append(elli)
 

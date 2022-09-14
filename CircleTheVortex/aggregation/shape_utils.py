@@ -168,3 +168,41 @@ def IoU_metric(params1, params2, reshape=True):
         # catch divide by zero (i.e. cases when neither shape has an area)
         return np.inf
     return 1 - intersection / union
+
+
+def get_major_minor_axis(params):
+    '''
+        Get the points on the major and minor axis in order
+        from the positive-x going clockwise
+        Parameters
+        ----------
+        params : list
+            A list of parameters for the ellipse
+
+        Returns
+        -------
+        points : numpy.ndarray
+            A set of coordinates for the four
+            major/minor axis points
+    '''
+    x0, y0, rx, ry, a = params
+
+    a = np.radians(a)
+
+    rotation = np.asarray([[np.cos(a), np.sin(a)],
+                           [-np.sin(a), np.cos(a)]])
+
+    points = []
+    for theta in [0, 1, 2, 3]:
+        theta *= np.pi/2
+
+        x, y = rx*np.cos(theta), ry*np.sin(theta)
+        points.append([x, y])
+
+    points = np.asarray(points)
+    points_rot = np.dot(rotation, points.T).T
+
+    points_rot[:, 0] += x0
+    points_rot[:, 1] += y0
+
+    return points_rot

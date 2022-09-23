@@ -6,7 +6,7 @@ from copy import deepcopy
 import tqdm
 
 
-def cluster_vortices(ellipses):
+def cluster_vortices(ellipses, verbose=False):
     '''
         Given a set of ellipses, find groups of vortices
         and cluster them together. Also filter out "lone" ellipses
@@ -21,7 +21,7 @@ def cluster_vortices(ellipses):
 
     # first find the IoU between all the ellipses
     # to find the lone vortices
-    with tqdm.tqdm(total=len(ellipse_queue)) as pbar:
+    with tqdm.tqdm(total=len(ellipse_queue), disable=~verbose) as pbar:
         while len(ellipse_queue) > 0:
             nellipses = len(ellipse_queue)
             elli = ellipse_queue[0]
@@ -52,8 +52,6 @@ def cluster_vortices(ellipses):
 
             # remove the overlapping elements from the group
             ellipse_queue = np.delete(ellipse_queue, delete_mask)
-
-    print(f"{len(lone_ellipses)} vortices; {len(ellipse_groups)} groups")
 
     return lone_ellipses, ellipse_groups
 
@@ -92,8 +90,8 @@ def average_vortex_cluster(ellipses):
         # update the ellipse to match the new center
         ell_new = deepcopy(ell)
 
-        ell_new.ellipse_params[0] = x0 + ell_new.ellipse_params[0] - ell.x0/2
-        ell_new.ellipse_params[1] = y0 + ell_new.ellipse_params[1] - ell.y0/2
+        ell_new.ellipse_params[0] = x0 + ell_new.ellipse_params[0] - ell.x0
+        ell_new.ellipse_params[1] = y0 + ell_new.ellipse_params[1] - ell.y0
 
         # update the reference frame for these new
         # transformed ellipses

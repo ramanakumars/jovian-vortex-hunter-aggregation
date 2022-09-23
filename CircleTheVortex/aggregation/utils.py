@@ -2,9 +2,28 @@ import numpy as np
 
 
 flat = 0.06487  # flattening parameter
+beta = 1 / (1 - flat)  # rp/re
 re = 71492e3  # equatorial radius
-rp = re * (1 - flat)  # polar radius
+rp = re / beta  # polar radius
 pixscale = 7000e3 / 384  # pixel scale
+
+
+def lat_pg(lat_pc):
+    '''
+        Convert planetocentric latitude to planetographic
+        Inputs
+        ------
+        lat_pc : float
+            planetocentric latitude in degress
+
+        Returns
+        -------
+        lat_pg : float
+            planetographic latitude in degrees
+    '''
+    lat_pg = np.degrees(np.arctan(np.tan(np.abs(np.radians(lat_pc))) *
+                                  beta * beta))
+    return np.sign(lat_pc) * lat_pg
 
 
 def pixel_to_lonlat(x, y, lon0, lat0, x0=192, y0=192):

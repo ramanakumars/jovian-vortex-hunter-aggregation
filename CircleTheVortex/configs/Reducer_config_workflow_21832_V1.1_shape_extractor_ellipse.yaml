@@ -1,11 +1,12 @@
 reducer_config:
-    shape_reducer_hdbscan:
+    shape_reducer_dbscan:
         details:
             T0_tool4:
             - question_reducer
             - question_reducer
         shape: ellipse
         allow_single_cluster: True
-        min_cluster_size: 2
+        min_cluster_size: 4
         min_samples: 2
+        eps: 0.5
         metric_type: IoU

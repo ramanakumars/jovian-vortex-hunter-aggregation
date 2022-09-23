@@ -19,6 +19,42 @@ class BaseVortex:
         self.x0 = x0
         self.y0 = y0
 
+        self.autorotate()
+        self.get_physical_extents()
+
+    @classmethod
+    def from_dict(cls, data):
+        ellipse_params = []
+        for i, key in enumerate(['x', 'y', 'rx', 'ry', 'angle']):
+            ellipse_params.append(data[key])
+
+        if 'sigma' in data.keys():
+            conf = data['sigma']
+        elif 'probability' in data.keys():
+            conf = data['probability']
+
+        ell = cls(ellipse_params, conf, data['lon'], data['lat'],
+                  data['x'], data['y'])
+
+        if 'subject_id' in data.keys():
+            ell.subject_id = data['subject_id']
+        elif 'subject_ids' in data.keys():
+            ell.subject_ids = data['subject_ids']
+
+        ell.perijove = data['perijove']
+        ell.color = data['color']
+
+        if 'extracts' in data.keys():
+            extracts = []
+            for extract in data['extracts']:
+                ext_ell = ExtractVortex.from_dict(extract)
+
+                extracts.append(ext_ell)
+
+            ell.extracts = extracts
+
+        return ell
+
     @property
     def subject_id(self):
         return self.subject_id_
@@ -50,6 +86,39 @@ class BaseVortex:
     @color.setter
     def color(self, color):
         self.color_ = color
+
+    def autorotate(self):
+        x0, y0, rx, ry, a = self.ellipse_params
+
+        if ry > rx:
+            # switch the semi-major and semi-minor axes
+            # if the semi-major < semi-minor
+            rx, ry = ry, rx
+
+            # add 90 to the rotation
+            # to compensate for the switch
+            a += 90
+
+            # modify the rotation so it fits in [-180, 180]
+            while a > 180:
+                a -= 180
+            while a < -180:
+                a += 180
+
+        # update the parameters
+        self.ellipse_params = [x0, y0, rx, ry, a]
+
+    def get_physical_extents(self):
+        corner_points = get_major_minor_axis(self.ellipse_params)
+        corner_lons, corner_lats = pixel_to_lonlat(corner_points[:, 0],
+                                                   corner_points[:, 1],
+                                                   self.lon0, self.lat0,
+                                                   self.x0, self.y0)
+
+        corner_points = np.dstack((corner_lons, corner_lats))[0, :]
+
+        self.sx, self.Lx = vincenty(corner_points[0], corner_points[2])
+        self.sy, self.Ly = vincenty(corner_points[1], corner_points[3])
 
     def get_points(self):
         ell = params_to_shape(self.ellipse_params).exterior.xy
@@ -101,21 +170,10 @@ class BaseVortex:
         elif hasattr(self, 'probability'):
             outdict['probability'] = self.probability
 
-        corner_points = get_major_minor_axis(self.ellipse_params)
-        corner_lons, corner_lats = pixel_to_lonlat(corner_points[:, 0],
-                                                   corner_points[:, 1],
-                                                   self.lon0, self.lat0,
-                                                   self.x0, self.y0)
-
-        corner_points = np.dstack((corner_lons, corner_lats))[0, :]
-
-        sx, Lx = vincenty(corner_points[0], corner_points[2])
-        sy, Ly = vincenty(corner_points[1], corner_points[3])
-
-        outdict['angular_width'] = Lx
-        outdict['angular_height'] = Ly
-        outdict['physical_width'] = sx
-        outdict['physical_height'] = sy
+        outdict['angular_width'] = self.Lx
+        outdict['angular_height'] = self.Ly
+        outdict['physical_width'] = self.sx
+        outdict['physical_height'] = self.sy
 
         if hasattr(self, 'extracts_'):
             outdict['extracts'] = []
@@ -143,6 +201,9 @@ class ExtractVortex(BaseVortex):
         self.x0 = x0
         self.y0 = y0
 
+        self.autorotate()
+        self.get_physical_extents()
+
     def confidence(self):
         return self.probability
 
@@ -164,6 +225,9 @@ class ClusterVortex(BaseVortex):
 
         self.x0 = x0
         self.y0 = y0
+
+        self.autorotate()
+        self.get_physical_extents()
 
     def confidence(self):
         return self.sigma

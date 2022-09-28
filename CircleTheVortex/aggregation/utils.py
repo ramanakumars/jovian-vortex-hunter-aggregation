@@ -26,6 +26,24 @@ def lat_pg(lat_pc):
     return np.sign(lat_pc) * lat_pg
 
 
+def lat_pc(lat_pg):
+    '''
+        Convert planetographic latitude to planetocentric
+        Inputs
+        ------
+        lat_pg : float
+            planetographic latitude in degress
+
+        Returns
+        -------
+        lat_pc : float
+            planetocentric latitude in degrees
+    '''
+    lat_pc = np.degrees(np.arctan(np.tan(np.abs(np.radians(lat_pg))) /
+                                  (beta * beta)))
+    return np.sign(lat_pg) * lat_pc
+
+
 def pixel_to_lonlat(x, y, lon0, lat0, x0=192, y0=192):
     '''
         Get the (lon, lat) of a pixel given the

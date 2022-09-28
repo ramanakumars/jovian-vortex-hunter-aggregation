@@ -9,6 +9,7 @@ from skimage import io
 from .shape_utils import get_sigma_shape, params_to_shape
 from .vortex import ExtractVortex, ClusterVortex
 from .subjects import SubjectLoader
+from .utils import lat_pg
 
 
 class NpEncoder(json.JSONEncoder):
@@ -171,6 +172,8 @@ class Aggregator:
             datai[f'{key}_clusters']['sigma']) < sigma_cut)[0]
 
         lon, lat, PJ = self.subject_data.get_meta(sub)
+
+        lat = lat_pg(lat)
 
         x0 = np.asarray(datai[f'{key}_clusters']['x'])[inds]
         y0 = np.asarray(datai[f'{key}_clusters']['y'])[inds]

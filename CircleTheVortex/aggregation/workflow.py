@@ -5,6 +5,7 @@ import ast
 import json
 import tqdm
 from panoptes_client import Subject
+from collections import defaultdict
 from skimage import io
 from .shape_utils import get_sigma_shape, params_to_shape, IoU_metric
 from .vortex import ExtractVortex, ClusterVortex
@@ -132,7 +133,71 @@ class Aggregator:
             except KeyError:
                 clust_data[subkey] = []
 
+        if clust_data['probabilities'] == []:
+            clust_data['probabilities'] = [1]*len(ext_data['x'])
+
+        if key=='multi-color':
+            try:
+                details = ast.literal_eval(data[
+                    'data.frame0.T0_tool4_clusters_details'
+                ][0])
+                colors = self.get_multi_color_data(details)
+            except ValueError as e:
+                colors = []
+
+            clust_data['colors'] = colors
+
         return ext_data, clust_data
+
+    def get_multi_color_data(self, data):
+        colorID = {'0': 'white', '1': 'red', '2': 'brown'}
+
+        center, edge = data
+
+        nellipses = len(center)
+
+        assert len(center) == len(edge), "Different number of center"\
+            "and edge color values"
+
+        colors = []
+
+        for i in range(nellipses):
+            center_votes = {colorID[key]:0 for key in colorID.keys()}
+            for key in center[i].keys():
+                center_votes[colorID[key]] = center[i][key]
+
+            nvotes = sum([count for (key, count) in center_votes.items()])
+ 
+            center_agreement = {}
+            for key, count in center_votes.items():
+                center_agreement[key] = count/nvotes
+
+            center_consensus = max(center_agreement,
+                                   key=center_agreement.get)
+            
+            edge_votes = {colorID[key]:0 for key in colorID.keys()}
+            for key in edge[i].keys():
+                edge_votes[colorID[key]] = edge[i][key]
+
+            nvotes = sum([count for (key, count) in edge_votes.items()])
+ 
+            edge_agreement = {}
+            for key, count in edge_votes.items():
+                edge_agreement[key] = count/nvotes
+
+            edge_consensus = max(edge_agreement,
+                                   key=edge_agreement.get)
+
+            colors.append({'center': 
+                           {'consensus': center_consensus,
+                            'agreements': center_agreement,
+                            }, 
+                           'edge': 
+                           {'consensus': edge_consensus,
+                            'agreements': edge_agreement,
+                            }})
+
+        return colors
 
     def get_ellipses(self, sigma_cut=0.6, prob_cut=0.5):
         ellipses = {'white': [], 'red': [], 'brown': [], 'dark': []}

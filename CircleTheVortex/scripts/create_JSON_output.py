@@ -7,5 +7,5 @@ except Exception:
     pass
 
 
-aggregator = Aggregator('reductions/shape_reducer_hdbscan_reductions.csv')
+aggregator = Aggregator('reductions/shape_reducer_dbscan_reductions.csv')
 aggregator.save_JSON('reductions/data.json')

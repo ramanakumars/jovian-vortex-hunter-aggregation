@@ -36,7 +36,7 @@ def cluster_vortices(ellipses, verbose=False):
                                           ellipse_queue[j].convert_to_lonlat(),
                                           reshape=False)
 
-            delete_mask = np.where(IoUs > 0)[0]
+            delete_mask = np.where(IoUs > elli.confidence())[0]
 
             # check the IoUs
             if IoUs[1:].sum() == 0:
@@ -56,7 +56,7 @@ def cluster_vortices(ellipses, verbose=False):
     return lone_ellipses, ellipse_groups
 
 
-def average_vortex_cluster(ellipses):
+def average_vortex_cluster(ellipses, prob_cut=0.5):
     '''
         Given a cluster of ellipes, find the average ellipse
         This is done in the 'physical' frame and output ellipse is also
@@ -100,7 +100,8 @@ def average_vortex_cluster(ellipses):
         ell_new.x0 = 0
         ell_new.y0 = 0
 
-        new_ells.append(ell_new)
+        if ell_new.confidence() > prob_cut:
+            new_ells.append(ell_new)
 
     # get the average of this cluster of ellipses
     avg_shape, sigma = average_shape_IoU(

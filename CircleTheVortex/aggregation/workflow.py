@@ -6,7 +6,7 @@ import json
 import tqdm
 from panoptes_client import Subject
 from skimage import io
-from .shape_utils import get_sigma_shape, params_to_shape
+from .shape_utils import get_sigma_shape, params_to_shape, IoU_metric
 from .vortex import ExtractVortex, ClusterVortex
 from .subjects import SubjectLoader
 from .utils import lat_pg
@@ -123,7 +123,7 @@ class Aggregator:
                     ][0])
             except KeyError:
                 clust_data[subkey] = []
-        for subkey in ['labels', 'probabilities']:
+        for subkey in ['labels']:
             try:
                 clust_data[subkey] = string_to_np_array(
                     data[
@@ -131,9 +131,6 @@ class Aggregator:
                     ][0])
             except KeyError:
                 clust_data[subkey] = []
-
-        if clust_data['probabilities'] == []:
-            clust_data['probabilities'] = [1]*len(ext_data['x'])
 
         return ext_data, clust_data
 
@@ -186,7 +183,6 @@ class Aggregator:
 
         ellipses = []
         for i in range(len(x0)):
-            pari = np.asarray([x0[i], y0[i], w[i], h[i], a[i]])
 
             ext_inds = np.where(np.asarray(
                 datai[f'{key}_clusters']['labels']) == inds[i])[0]
@@ -200,27 +196,32 @@ class Aggregator:
                 datai[f'{key}_extracts']['ry'])[ext_inds]
             ext_a = np.asarray(
                 datai[f'{key}_extracts']['angle'])[ext_inds]
-            ext_prob = np.asarray(
-                datai[f'{key}_clusters']
-                ['probabilities'])[ext_inds]
+
+            pari = np.asarray([x0[i], y0[i], w[i], h[i], a[i]])
+
+            elli = ClusterVortex(pari, sigma[i], lon, lat)
+
+            elli.subject_id = sub
 
             extracts = []
             for j in range(len(ext_x0)):
-                if ext_prob[j] < prob_cut:
-                    continue
-                pari = np.asarray([ext_x0[j], ext_y0[j], ext_w[j],
-                                   ext_h[j], ext_a[j]])
-                ext_ellipse = ExtractVortex(pari, ext_prob[j],
+                par_ext = np.asarray([ext_x0[j], ext_y0[j], ext_w[j],
+                                      ext_h[j], ext_a[j]])
+                # set a dummy probability now and we will calculate 
+                # it later using the IoU metric
+                ext_ellipse = ExtractVortex(par_ext, 1.,
                                             lon, lat)
                 ext_ellipse.subject_id = sub
                 ext_ellipse.perijove = PJ
                 ext_ellipse.color = key
 
+                prob = IoU_metric(ext_ellipse.get_points(),
+                                  elli.get_points(), reshape=False)
+
+                ext_ellipse.probability = 1. - prob
+
                 extracts.append(ext_ellipse)
 
-            elli = ClusterVortex(pari, sigma[i], lon, lat)
-
-            elli.subject_id = sub
             elli.extracts = extracts
             elli.perijove = PJ
             elli.color = key

@@ -100,7 +100,7 @@ def average_bounds(params_list):
     return bound
 
 
-def average_shape_IoU(params_list, sigma, shape='ellipse'):
+def average_shape_IoU(params_list, sigma):
     '''Find the average shape and standard deviation from a
     list of parameters with respect to the IoU metric.
     Parameters
@@ -119,9 +119,9 @@ def average_shape_IoU(params_list, sigma, shape='ellipse'):
         respect to the IoU metric
     '''
     def sum_distance(x):
-        return sum([sigma[i]*IoU_metric(params_to_shape(x),
-                                        params_to_shape(params_list[i]),
-                                        reshape=False)**2
+        return sum([(sigma[i]*IoU_metric(params_to_shape(x),
+                                         params_to_shape(params_list[i]),
+                                         reshape=False))**2.
                     for i in range(len(params_list))])
     # find shape that minimizes the variance in the IoU metric using bounds
     m = scipy.optimize.shgo(

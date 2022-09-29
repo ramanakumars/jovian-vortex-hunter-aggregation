@@ -47,7 +47,7 @@ for PJ in range(13, 36):
         pbar.set_postfix_str(f"{key}: {len(ellipses_i)} => "
                              f"{len(groups)} gr, {len(lone)} ln")
 
-        with multiprocessing.Pool(processes=8,
+        with multiprocessing.Pool(processes=16,
                                   initializer=initializer) as pool:
             inp_args = []
             # get the list of extracts in the different groups

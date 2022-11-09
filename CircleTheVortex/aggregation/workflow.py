@@ -207,7 +207,7 @@ class Aggregator:
             for j in range(len(ext_x0)):
                 par_ext = np.asarray([ext_x0[j], ext_y0[j], ext_w[j],
                                       ext_h[j], ext_a[j]])
-                # set a dummy probability now and we will calculate 
+                # set a dummy probability now and we will calculate
                 # it later using the IoU metric
                 ext_ellipse = ExtractVortex(par_ext, 1.,
                                             lon, lat)
@@ -276,14 +276,11 @@ class Aggregator:
                 ax.plot(*ellr.exterior.xy, '-', color=colors[key], linewidth=1)
 
             for vals in zip(exti['x'], exti['y'], exti['rx'], exti['ry'],
-                            exti['angle'], clusti['probabilities']):
-                params = vals[:-1]
-                prob = vals[-1]
-
-                ellr = params_to_shape(params)
+                            exti['angle']):
+                ellr = params_to_shape(vals)
 
                 ax.plot(*ellr.exterior.xy, '--',
-                        color=colors[key], linewidth=0.35, alpha=0.25+0.5*prob)
+                        color=colors[key], linewidth=0.35)
 
         ax.set_xlim((0, 384))
         ax.set_ylim((384, 0))

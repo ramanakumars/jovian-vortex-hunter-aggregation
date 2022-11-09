@@ -26,7 +26,7 @@ aggregator = Aggregator.from_JSON('reductions/data.json')
 aggregator.load_subject_data('../subjects_data.csv')
 
 # get the unique list of vortices
-ellipses = aggregator.get_ellipses(sigma_cut=0.8, prob_cut=0.)
+ellipses = aggregator.get_ellipses(sigma_cut=0.5, prob_cut=0.)
 
 print()
 

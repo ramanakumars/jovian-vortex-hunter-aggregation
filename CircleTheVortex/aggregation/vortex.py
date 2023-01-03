@@ -1,6 +1,6 @@
 import numpy as np
 from .utils import pixel_to_lonlat, vincenty
-from .shape_utils import params_to_shape, get_major_minor_axis
+from .shape_utils import params_to_shape, get_major_minor_axis, IoU_metric
 
 
 class BaseVortex:
@@ -121,17 +121,25 @@ class BaseVortex:
         self.sy, self.Ly = vincenty(corner_points[1], corner_points[3])
 
     def get_points(self):
-        ell = params_to_shape(self.ellipse_params).exterior.xy
-        return np.dstack((ell[0], ell[1]))[0, :]
+        if not hasattr(self, 'points'):
+            # cache the calculation when doing this repeatedly
+            ell = params_to_shape(self.ellipse_params).exterior.xy
+            self.points = np.dstack((ell[0], ell[1]))[0, :]
+
+        return self.points
 
     def convert_to_lonlat(self):
-        points = self.get_points()
-        xx, yy = points[:, 0], points[:, 1]
+        if not hasattr(self, 'points_lonlat'):
+            # cache the calculation when doing this repeatedly
+            points = self.get_points()
+            xx, yy = points[:, 0], points[:, 1]
 
-        lons, lats = pixel_to_lonlat(xx, yy, self.lon0, self.lat0,
-                                     self.x0, self.y0)
+            lons, lats = pixel_to_lonlat(xx, yy, self.lon0, self.lat0,
+                                         self.x0, self.y0)
 
-        return np.dstack((lons, lats))[0, :]
+            self.points_lonlat = np.dstack((lons, lats))[0, :]
+
+        return self.points_lonlat
 
     def get_center_lonlat(self):
         xc, yc = self.ellipse_params[:2]
@@ -229,6 +237,16 @@ class ClusterVortex(BaseVortex):
         self.autorotate()
         self.get_physical_extents()
 
+    @property
+    def ext_IoUs(self):
+        if not hasattr(self, '_ext_IoU'):
+            self._ext_IoUs = np.zeros(len(self.extracts))
+            for j, ext in enumerate(self.extracts):
+                self._ext_IoUs[j] = 1. - IoU_metric(self.convert_to_lonlat(),
+                                          ext.convert_to_lonlat(),
+                                          reshape=False)
+        return self._ext_IoUs
+
     def confidence(self):
         return self.sigma
 
@@ -246,3 +264,31 @@ class MultiSubjectVortex(ClusterVortex):
     @subject_ids.setter
     def subject_ids(self, subject_ids):
         self.subject_ids_ = subject_ids
+
+    @classmethod
+    def from_dict(cls, data):
+        obj = super(MultiSubjectVortex, cls).from_dict(data)
+        obj.set_color()
+        return obj
+
+    def set_color(self):
+        exts = self.extracts
+
+        colors = [ext.color for ext in exts]
+
+        un_colors, counts = np.unique(colors, return_counts=True)
+
+
+        # convert to an agreement fraction
+        counts = counts/np.sum(counts)
+
+        # the final color is the one with the most votes
+        self.color = un_colors[np.argmax(counts)]
+        self.colors = {un_colors[i]:counts[i] for i in range(len(counts))}
+
+    def as_dict(self):
+        outdict = super(MultiSubjectVortex, self).as_dict()
+
+        outdict['colors'] = self.colors
+
+        return outdict

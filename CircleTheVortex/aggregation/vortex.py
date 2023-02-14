@@ -33,8 +33,7 @@ class BaseVortex:
         elif 'probability' in data.keys():
             conf = data['probability']
 
-        ell = cls(ellipse_params, conf, data['lon'], data['lat'],
-                  data['x'], data['y'])
+        ell = cls(ellipse_params, conf, data['lon'], data['lat'], data['x'], data['y'])
 
         if 'subject_id' in data.keys():
             ell.subject_id = data['subject_id']
@@ -139,7 +138,7 @@ class BaseVortex:
 
             self.points_lonlat = np.dstack((lons, lats))[0, :]
 
-        return self.points_lonlat
+        return self.points_lonlat.copy()
 
     def get_center_lonlat(self):
         xc, yc = self.ellipse_params[:2]
@@ -169,6 +168,7 @@ class BaseVortex:
             raise ValueError("Please assign a color label to this vortex")
 
         outdict['lon'], outdict['lat'] = self.get_center_lonlat()
+        outdict['x0'], outdict['y0'] = (self.x0, self.y0)
 
         for i, key in enumerate(['x', 'y', 'rx', 'ry', 'angle']):
             outdict[key] = self.ellipse_params[i]
@@ -248,7 +248,7 @@ class ClusterVortex(BaseVortex):
         return self._ext_IoUs
 
     def confidence(self):
-        return self.sigma
+        return np.sqrt(1. - self.sigma**2.)
 
 
 class MultiSubjectVortex(ClusterVortex):

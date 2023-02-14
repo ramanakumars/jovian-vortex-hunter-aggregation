@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 flat = 0.06487  # flattening parameter
@@ -156,3 +157,53 @@ def vincenty(p1, p2, MAX_ITER=500):
     s = rp * A * (sigma - dsig)
 
     return s, np.degrees(sigma)
+
+
+def plot_ellipse(ell):
+    fig, ax = plt.subplots(1,1, dpi=150, figsize=(8,4))
+    # read in the mosaic for this perijove
+    jup_map = plt.imread(f'/home/rsankar/zooniverse/JuDE/backend/PJimgs/PJ{ell.perijove}/globe_mosaic_highres.png')[:,:,:3]
+    
+    # get the points for this ellipse
+    center = np.asarray(ell.get_center_lonlat())
+    center[1] = lat_pc(center[1])
+    points = ell.convert_to_lonlat().T
+    points[1,:] = lat_pc(points[1,:])
+    
+    # read in the extents for the map for this ellipse
+    dlon = max([ell.Lx*2, 10])
+    dlat = max([ell.Ly*2, 3])
+    x0, x1 = max([center[0] - dlon, -180]), min([center[0] + dlon, 180])
+    y0, y1 = max([center[1] - dlat, -90]), min([center[1] + dlat, 90])
+    
+    # convert this to point coordinates
+    sy, ey = 4500 - int((y0 + 90)*25), 4500 - int((y1 + 90)*25)
+    sx, ex = int((x0 + 180)*25), int((x1 + 180)*25)
+    
+    # plot the map
+    ax.imshow(jup_map[sy:ey:-1, sx:ex], extent=(x0, x1, y1, y0), aspect='equal')
+    
+    # plot out all the colors for this ellipse
+    colors = {'white': '#eee', 'red': 'red', 'brown': 'brown', 'dark': 'grey'}
+    for j, ell_ext in enumerate(ell.extracts):
+        points = ell_ext.convert_to_lonlat().T
+        points[1,:] = lat_pc(points[1:])
+        ax.plot(*points, '--', linewidth=0.15, color=colors[ell_ext.color])
+
+    # plot the cluster
+    points = ell.convert_to_lonlat().T
+    points[1,:] = lat_pc(points[1:])
+    ax.plot(*center, 'x', color=colors[ell.color])
+    ax.plot(*points, '-', color=colors[ell.color], linewidth=0.5)
+    
+    ax.set_aspect('equal')
+    
+    ax.set_xlabel(r'Longitude [$\degree$]')
+    ax.set_ylabel(r'Latitude [$\degree$]')
+    
+    ax.set_xlim((x0, x1))
+    ax.set_ylim((y0, y1))
+    
+    plt.tight_layout()
+    plt.show()
+    plt.close(fig)

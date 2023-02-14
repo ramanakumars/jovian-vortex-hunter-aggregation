@@ -21,7 +21,8 @@ def cluster_vortices(ellipses, verbose=False):
 
     # first find the IoU between all the ellipses
     # to find the lone vortices
-    with tqdm.tqdm(total=len(ellipse_queue), disable=~verbose) as pbar:
+    with tqdm.tqdm(total=len(ellipse_queue), desc='Clustering vortices',
+                   disable=not verbose, leave=False) as pbar:
         while len(ellipse_queue) > 0:
             nellipses = len(ellipse_queue)
             elli = ellipse_queue[0]
@@ -36,7 +37,7 @@ def cluster_vortices(ellipses, verbose=False):
                                           ellipse_queue[j].convert_to_lonlat(),
                                           reshape=False)
 
-            delete_mask = np.where(IoUs > elli.confidence())[0]
+            delete_mask = np.where(IoUs > 0.1)[0]
 
             # check the IoUs
             if IoUs[1:].sum() == 0:
@@ -118,12 +119,10 @@ def average_vortex_cluster(ellipses, prob_cut=0.5):
     avg_ellipse.subject_ids = np.unique([
         ell.subject_id for ell in new_ells]).tolist()
 
+    avg_ellipse.set_color()
+
     assert len(np.unique([ell.perijove for ell in new_ells])) == 1,\
         "All the ellipses must belong to the same perijove!"
     avg_ellipse.perijove = new_ells[0].perijove
-
-    assert len(np.unique([ell.color for ell in new_ells])) == 1,\
-        "All the ellipses must be the same color!"
-    avg_ellipse.color = new_ells[0].color
 
     return avg_ellipse

@@ -26,86 +26,87 @@ aggregator = Aggregator.from_JSON('reductions/data.json')
 aggregator.load_subject_data('../subjects_data.csv')
 
 # get the unique list of vortices
-ellipses = aggregator.get_ellipses(sigma_cut=0.8, prob_cut=0.)
+ellipses = aggregator.get_ellipses(sigma_cut=0.5, prob_cut=0.)
 
 print()
 
 avg_ellipses = []
 
-pbar = tqdm.tqdm(total=(36-13)*4, desc='Finding vortices', position=0)
+pbar = tqdm.tqdm(total=(36-13), desc='Finding vortices', position=0)
 
 for PJ in range(13, 36):
+    ellipses_i = []
     for key in ['white', 'red', 'brown', 'dark']:
         # find the ellipses in this perijove which correspond
         # to this color
-        ellipses_i = list(filter(lambda e: e.perijove == PJ,
-                                 ellipses[key]))
+        ellipses_i.extend(list(filter(lambda e: e.perijove == PJ,
+                                 ellipses[key])))
 
-        # get the clusters and lone vortices
-        lone, groups = cluster_vortices(ellipses_i)
+    # get the clusters and lone vortices
+    lone, groups = cluster_vortices(ellipses_i, verbose=True)
 
-        pbar.set_postfix_str(f"{key}: {len(ellipses_i)} => "
-                             f"{len(groups)} gr, {len(lone)} ln")
+    pbar.set_postfix_str(f"{len(ellipses_i)} => "
+                         f"{len(groups)} gr, {len(lone)} ln")
 
-        with multiprocessing.Pool(processes=16,
-                                  initializer=initializer) as pool:
-            inp_args = []
-            # get the list of extracts in the different groups
-            for ell_group in groups:
-                ells_ext = []
-                _ = [ells_ext.extend(ell.extracts) for ell in ell_group]
+    with multiprocessing.Pool(processes=16,
+                              initializer=initializer) as pool:
+        inp_args = []
+        # get the list of extracts in the different groups
+        for ell_group in groups:
+            ells_ext = []
+            _ = [ells_ext.extend(ell.extracts) for ell in ell_group]
 
-                inp_args.append(ells_ext)
+            inp_args.append(ells_ext)
 
-            try:
-                # apply the extracts on the cluster averaging function
-                r = pool.map_async(average_vortex_cluster, inp_args)
+        try:
+            # apply the extracts on the cluster averaging function
+            r = pool.map_async(average_vortex_cluster, inp_args)
 
-                pool.close()
+            pool.close()
 
-                # print out a progress bar
-                tasks = pool._cache[r._job]
-                ninpt = len(inp_args)
+            # print out a progress bar
+            tasks = pool._cache[r._job]
+            ninpt = len(inp_args)
 
-                with tqdm.tqdm(total=ninpt,
-                               position=1,
-                               leave=False) as pbar_inner:
-                    while tasks._number_left > 0:
-                        pbar_inner.n = max([ninpt - tasks._number_left *
-                                            tasks._chunksize, 0])
-                        pbar_inner.refresh()
+            with tqdm.tqdm(total=ninpt,
+                           position=1, desc='Finding cluster averages',
+                           leave=False) as pbar_inner:
+                while tasks._number_left > 0:
+                    pbar_inner.n = max([ninpt - tasks._number_left *
+                                        tasks._chunksize, 0])
+                    pbar_inner.refresh()
 
-                        time.sleep(0.5)
-            except Exception as e:
-                print(e)
-                pool.terminate()
-                pool.join()
-
+                    time.sleep(0.5)
+        except Exception as e:
+            print(e)
+            pool.terminate()
             pool.join()
 
-            # get the results from the multiprocessing queue
-            results = r.get()
+        pool.join()
 
-        # add the results back to the original list of vortices
-        for res in results:
-            avg_ellipses.append(res)
+        # get the results from the multiprocessing queue
+        results = r.get()
 
-        for ell in lone:
-            # lone vortices will be converted to a multisubjectvortex
-            # but with a list of one subject_id
-            avg_ell = MultiSubjectVortex(ell.ellipse_params,
-                                         ell.sigma,
-                                         ell.lon0, ell.lat0,
-                                         ell.x0, ell.y0)
+    # add the results back to the original list of vortices
+    for res in results:
+        avg_ellipses.append(res)
 
-            avg_ell.perijove = ell.perijove
-            avg_ell.color = ell.color
-            avg_ell.extracts = ell.extracts
-            avg_ell.subject_ids = [ell.subject_id]
+    for ell in lone:
+        # lone vortices will be converted to a multisubjectvortex
+        # but with a list of one subject_id
+        avg_ell = MultiSubjectVortex(ell.ellipse_params,
+                                     ell.sigma,
+                                     ell.lon0, ell.lat0,
+                                     ell.x0, ell.y0)
 
-            avg_ellipses.append(avg_ell)
+        avg_ell.perijove = ell.perijove
+        avg_ell.extracts = ell.extracts
+        avg_ell.subject_ids = [ell.subject_id]
+        avg_ell.set_color()
 
-        pbar.update(1)
+        avg_ellipses.append(avg_ell)
+
+    pbar.update(1)
 
 # save out the data
 with open('reductions/vortices.json', 'w') as outfile:

@@ -5,7 +5,6 @@ import json
 from .vortex import MultiSubjectVortex
 from scipy.interpolate import interp1d
 from aggregation.utils import re, rp
-import umap
 
 
 class ZonalWind:
@@ -66,34 +65,32 @@ class Vortices:
 
         # loop through each entry and build it into 
         # a vortex object
+        # go through each vortex and create
+        # the parameter data table
+        multi_dim_data = []
         vortices = []
         for vort in tqdm.tqdm(vortex_dict):
             if 'subject_ids' in vort.keys():
                 ell = MultiSubjectVortex.from_dict(vort)
                 ell.set_color()
-            if (len(ell.extracts) > 2)&(ell.confidence() < 0.4):
-                vortices.append(ell)
+            if (len(ell.extracts) > 2)&(ell.confidence() > 0.6):
+                lat = ell.get_center_lonlat()[1]
+                coriolis_beta = 2.*(1.76e-4)*np.cos(np.radians(lat))/rp
+                rowi = [zonal_wind.u_vs_lat(lat)/100,
+                        zonal_wind.du_vs_lat(lat)*1.e4,
+                        (coriolis_beta - zonal_wind.uyy_vs_lat(lat))*5.e10,
+                        ell.sx/5.e6 - 0.5, ell.sx/ell.sy]
+
+                if not np.isnan(rowi[1]):
+                    multi_dim_data.append(rowi)
+                    vortices.append(ell)
+        
         self.vortices = np.asarray(vortices)
-
-        # go through each vortex and create
-        # the parameter data table
-        multi_dim_data = []
-        for i, e in enumerate(vortices):
-            lat = e.get_center_lonlat()[1]
-            coriolis_beta = 2.*(1.76e-4)*np.cos(np.radians(lat))/rp
-            rowi = [e, zonal_wind.u_vs_lat(lat)/100,
-                    zonal_wind.du_vs_lat(lat)*1.e4,
-                    (coriolis_beta - zonal_wind.uyy_vs_lat(lat))*5.e10,
-                    e.sx/5.e6 - 0.5, e.sx/e.sy]
-
-            if not np.isnan(rowi[1]):
-                multi_dim_data.append(rowi)
-
         self.vort_params = np.asarray(multi_dim_data)
 
-    def plot_hist_sizes(self):
+    def plot_hist_sizes(self, bin_width=250):
         fig, axs = plt.subplots(2,2, dpi=150, sharex=True)
-        bins = np.arange(0, 6000, 250)
+        bins = np.arange(0, 6000, bin_width)
 
         colors = {'white': '#eee', 'red': 'red', 'brown': 'brown', 'dark': 'grey'}
         for i, key in enumerate(['white', 'red', 'brown', 'dark']):
@@ -108,9 +105,9 @@ class Vortices:
         axs[0,0].set_xlim(left=0)
         plt.show()
 
-    def plot_hist_aspect_ratio(self):
+    def plot_hist_aspect_ratio(self, nbins=20):
         fig, axs = plt.subplots(2,2, dpi=150, sharex=True)
-        bins = np.linspace(1, 3, 20)
+        bins = np.linspace(1, 3, nbins)
 
         colors = {'white': 'white', 'red': 'red', 'brown': 'brown', 'dark': 'grey'}
         for i, key in enumerate(['white', 'red', 'brown', 'dark']):

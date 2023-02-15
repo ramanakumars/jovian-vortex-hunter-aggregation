@@ -150,6 +150,7 @@ class Aggregator:
 
         colorID = {'0': 'white', '1': 'red', '2': 'brown'}
         lon, lat, PJ = self.subject_data.get_meta(subject)
+
         lat = lat_pg(lat)
 
         x0 = np.asarray(clust_data['x'])

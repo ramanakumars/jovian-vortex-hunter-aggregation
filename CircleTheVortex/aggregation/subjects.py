@@ -17,7 +17,7 @@ class SubjectLoader:
 
         # for each subject, add the metadata from the CSV file
         for i, subject_id in enumerate(tqdm.tqdm(subject_IDs,
-                                                 desc='Loading subject data')):
+                                                 desc='Loading subject data', ascii=True)):
             # get the row corresponding to this subject
             row = self.raw_data[ind[i]]
 

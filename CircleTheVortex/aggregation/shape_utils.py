@@ -119,9 +119,9 @@ def average_shape_IoU(params_list, sigma):
         respect to the IoU metric
     '''
     def sum_distance(x):
-        return sum([(sigma[i]*IoU_metric(params_to_shape(x),
-                                         params_to_shape(params_list[i]),
-                                         reshape=False))**2.
+        return sum([(sigma[i] * IoU_metric(params_to_shape(x),
+                                           params_to_shape(params_list[i]),
+                                           reshape=False))**2.
                     for i in range(len(params_list))])
     # find shape that minimizes the variance in the IoU metric using bounds
     m = scipy.optimize.shgo(
@@ -194,9 +194,9 @@ def get_major_minor_axis(params):
 
     points = []
     for theta in [0, 1, 2, 3]:
-        theta *= np.pi/2
+        theta *= np.pi / 2
 
-        x, y = rx*np.cos(theta), ry*np.sin(theta)
+        x, y = rx * np.cos(theta), ry * np.sin(theta)
         points.append([x, y])
 
     points = np.asarray(points)

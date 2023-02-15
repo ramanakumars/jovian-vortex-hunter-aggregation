@@ -43,6 +43,10 @@ class BaseVortex:
         ell.perijove = data['perijove']
         ell.color = data['color']
 
+        if 'center_color' in data.keys():
+            ell.center_color = data['center_color']
+            ell.edge_color = data['edge_color']
+
         if 'extracts' in data.keys():
             extracts = []
             for extract in data['extracts']:
@@ -183,6 +187,10 @@ class BaseVortex:
         outdict['physical_width'] = self.sx
         outdict['physical_height'] = self.sy
 
+        if hasattr(self, 'center_color'):
+            outdict['center_color'] = self.center_color
+            outdict['edge_color'] = self.edge_color
+
         if hasattr(self, 'extracts_'):
             outdict['extracts'] = []
 
@@ -243,8 +251,8 @@ class ClusterVortex(BaseVortex):
             self._ext_IoUs = np.zeros(len(self.extracts))
             for j, ext in enumerate(self.extracts):
                 self._ext_IoUs[j] = 1. - IoU_metric(self.convert_to_lonlat(),
-                                          ext.convert_to_lonlat(),
-                                          reshape=False)
+                                                    ext.convert_to_lonlat(),
+                                                    reshape=False)
         return self._ext_IoUs
 
     def confidence(self):
@@ -278,13 +286,12 @@ class MultiSubjectVortex(ClusterVortex):
 
         un_colors, counts = np.unique(colors, return_counts=True)
 
-
         # convert to an agreement fraction
-        counts = counts/np.sum(counts)
+        counts = counts / np.sum(counts)
 
         # the final color is the one with the most votes
         self.color = un_colors[np.argmax(counts)]
-        self.colors = {un_colors[i]:counts[i] for i in range(len(counts))}
+        self.colors = {un_colors[i]: counts[i] for i in range(len(counts))}
 
     def as_dict(self):
         outdict = super(MultiSubjectVortex, self).as_dict()

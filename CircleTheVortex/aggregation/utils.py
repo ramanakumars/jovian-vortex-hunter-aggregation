@@ -186,7 +186,11 @@ def plot_ellipse(ell):
               extent=(x0, x1, y1, y0), aspect='equal')
 
     # plot out all the colors for this ellipse
-    colors = {'white': '#eee', 'red': 'red', 'brown': 'brown', 'dark': 'grey'}
+    colors = {'dark': 'k', 'red': 'r', 'white': 'white', 'brown': 'brown',
+              'red-brown': 'chocolate', 'red-white': 'mistyrose',
+              'brown-red': 'firebrick', 'brown-white': 'rosybrown',
+              'white-red': 'salmon', 'white-brown': 'peru'}
+
     for j, ell_ext in enumerate(ell.extracts):
         points = ell_ext.convert_to_lonlat().T
         points[1, :] = lat_pc(points[1:])

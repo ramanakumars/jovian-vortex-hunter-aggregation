@@ -7,5 +7,5 @@ except Exception:
     pass
 
 
-aggregator = Aggregator('reductions/shape_reducer_dbscan_reductions.csv')
+aggregator = Aggregator('../subjects_data.csv', 'reductions/shape_reducer_dbscan_reductions.csv', autoload=True)
 aggregator.save_JSON('reductions/data.json')

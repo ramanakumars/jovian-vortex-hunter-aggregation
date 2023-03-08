@@ -2,6 +2,7 @@ import json
 import os.path
 import sys
 import tqdm
+import numpy as np
 import multiprocessing
 import signal
 import time
@@ -12,7 +13,8 @@ try:
     from aggregation.vortex import MultiSubjectVortex
     from aggregation.vortex_cluster import (cluster_vortices,
                                             average_vortex_cluster)
-except Exception:
+except Exception as e:
+    print(e)
     pass
 
 
@@ -22,40 +24,37 @@ def initializer():
 
 
 # load the classification data
-aggregator = Aggregator.from_JSON('reductions/data.json')
-aggregator.load_subject_data('../subjects_data.csv')
+aggregator = Aggregator.from_JSON('../subjects_data.csv', 'reductions/data.json')
 
 # get the unique list of vortices
-ellipses = aggregator.get_ellipses(sigma_cut=0.5, prob_cut=0.)
+ellipses = np.asarray(aggregator.get_ellipses(gamma_cut=0.6))
+
+PJs = np.asarray([e.perijove for e in ellipses])
+PJmin = np.min(PJs)
+PJmax = np.max(PJs)
 
 print()
 
 avg_ellipses = []
 
-pbar = tqdm.tqdm(total=(36-13), desc='Finding vortices', position=0)
+pbar = tqdm.tqdm(total=(PJmax - PJmin), desc='Finding vortex clusters', position=0, ascii=True)
 
-for PJ in range(13, 36):
-    ellipses_i = []
-    for key in ['white', 'red', 'brown', 'dark']:
-        # find the ellipses in this perijove which correspond
-        # to this color
-        ellipses_i.extend(list(filter(lambda e: e.perijove == PJ,
-                                 ellipses[key])))
+for PJ in range(PJmin, PJmax + 1):
+    # find the ellipses in this perijove which correspond
+    ellipses_i = ellipses[PJs == PJ]
 
     # get the clusters and lone vortices
     lone, groups = cluster_vortices(ellipses_i, verbose=True)
 
-    pbar.set_postfix_str(f"{len(ellipses_i)} => "
-                         f"{len(groups)} gr, {len(lone)} ln")
+    pbar.set_postfix_str(f"{len(ellipses_i)} => {len(groups)} gr, {len(lone)} ln")
 
-    with multiprocessing.Pool(processes=16,
-                              initializer=initializer) as pool:
+    with multiprocessing.Pool(processes=16, initializer=initializer) as pool:
         inp_args = []
+
         # get the list of extracts in the different groups
         for ell_group in groups:
             ells_ext = []
             _ = [ells_ext.extend(ell.extracts) for ell in ell_group]
-
             inp_args.append(ells_ext)
 
         try:
@@ -68,7 +67,7 @@ for PJ in range(13, 36):
             tasks = pool._cache[r._job]
             ninpt = len(inp_args)
 
-            with tqdm.tqdm(total=ninpt,
+            with tqdm.tqdm(total=ninpt, ascii=True,
                            position=1, desc='Finding cluster averages',
                            leave=False) as pbar_inner:
                 while tasks._number_left > 0:

@@ -22,7 +22,7 @@ def cluster_vortices(ellipses, verbose=False):
     # first find the IoU between all the ellipses
     # to find the lone vortices
     with tqdm.tqdm(total=len(ellipse_queue), desc='Clustering vortices',
-                   disable=not verbose, leave=False) as pbar:
+                   disable=not verbose, leave=False, ascii=True) as pbar:
         while len(ellipse_queue) > 0:
             nellipses = len(ellipse_queue)
             elli = ellipse_queue[0]

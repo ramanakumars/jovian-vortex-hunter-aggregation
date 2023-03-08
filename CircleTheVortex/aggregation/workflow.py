@@ -40,7 +40,9 @@ def string_to_np_array(data):
 
 
 class Aggregator:
-    def __init__(self, reduction_data=None, autoload=True):
+    def __init__(self, sub_file, reduction_data=None, autoload=False):
+        self.load_subject_data(sub_file)
+
         if reduction_data is None:
             return
 
@@ -49,58 +51,67 @@ class Aggregator:
         sub_ids = np.asarray(self.data['subject_id'])
         self.subjects = np.unique(sub_ids)
 
-        self.JSON_data = []
-
         if autoload:
-            for subject in tqdm.tqdm(self.subjects, desc='Parsing data'):
-                datasub = self.data[np.where(sub_ids == subject)[0]]
-                dark_ext, dark_clust = self.get_ellipse_data(
-                    subject, 'dark', datasub)
-                white_ext, white_clust = self.get_ellipse_data(
-                    subject, 'white', datasub)
-                red_ext, red_clust = self.get_ellipse_data(
-                    subject, 'red', datasub)
-                brown_ext, brown_clust = self.get_ellipse_data(
-                    subject, 'brown', datasub)
-
-                row = {'subject_id': subject,
-                       'dark_extracts': dark_ext,
-                       'dark_clusters': dark_clust,
-                       'white_extracts': white_ext,
-                       'white_clusters': white_clust,
-                       'red_extracts': red_ext,
-                       'red_clusters': red_clust,
-                       'brown_extracts': brown_ext,
-                       'brown_clusters': brown_clust
-                       }
-
-                self.JSON_data.append(row)
+            self.create_ellipse_data()
 
     @classmethod
-    def from_JSON(cls, JSONfile):
-        obj = cls(None)
+    def from_JSON(cls, sub_file, JSONfile):
+        obj = cls(sub_file, None)
 
         with open(JSONfile, 'r') as indata:
-            obj.JSON_data = json.load(indata)
+            JSON_data = json.load(indata)
 
-        obj.subjects = np.unique([d['subject_id'] for d in obj.JSON_data])
+        obj.ellipses = []
+        for e in tqdm.tqdm(JSON_data, desc='Getting ellipses', ascii=True):
+            obj.ellipses.append(ClusterVortex.from_dict(e))
+
+        obj.ellipses = np.asarray(obj.ellipses)
+
+        obj.subjects = np.unique([d.subject_id for d in obj.ellipses])
 
         return obj
 
     def save_JSON(self, outfile):
         with open(outfile, 'w') as outJSON:
-            json.dump(self.JSON_data, outJSON, cls=NpEncoder)
+            json.dump([e.as_dict() for e in self.ellipses], outJSON, cls=NpEncoder)
+
         print(f"Saved to {outfile}")
 
     def load_subject_data(self, sub_file):
+        '''
+            Load the subject metadata
+        '''
         self.subject_data = SubjectLoader(sub_file)
 
+    def create_ellipse_data(self):
+        '''
+            Create a list of ellipses from the raw CSV import
+        '''
+        sub_ids = np.asarray(self.data['subject_id'])
+
+        self.ellipses = []
+
+        for subject in tqdm.tqdm(self.subjects, desc='Parsing data', ascii=True):
+            datasub = self.data[np.where(sub_ids == subject)[0]]
+
+            dark_ells = self.get_ellipse_data(subject, 'dark', datasub)
+            white_ells = self.get_ellipse_data(subject, 'white', datasub)
+            red_ells = self.get_ellipse_data(subject, 'red', datasub)
+            brown_ells = self.get_ellipse_data(subject, 'brown', datasub)
+            multi_color_ells = self.get_ellipse_data(subject, 'multi-color', datasub)
+
+            self.ellipses.extend([*dark_ells, *white_ells, *red_ells, *brown_ells, *multi_color_ells])
+
+        self.ellipses = np.asarray(self.ellipses)
+
     def get_ellipse_data(self, subject, key, data=None):
+        '''
+            Get the ellipse data from the CSV reductions import
+        '''
         if data is None:
             data = self.data[(self.data['subject_id'] == subject)]
 
-        toolID = {'dark': 3, 'red': 0, 'white': 1,
-                  'brown': 2, 'multi-color': 4}
+        toolID = {'dark': 3, 'red': 0, 'white': 1, 'brown': 2, 'multi-color': 4}
 
         clust_data = {}
         ext_data = {}
@@ -123,6 +134,7 @@ class Aggregator:
                     ][0])
             except KeyError:
                 clust_data[subkey] = []
+
         for subkey in ['labels']:
             try:
                 clust_data[subkey] = string_to_np_array(
@@ -132,86 +144,57 @@ class Aggregator:
             except KeyError:
                 clust_data[subkey] = []
 
-        return ext_data, clust_data
+        if key == 'multi-color':
+            try:
+                details = ast.literal_eval(data[
+                    'data.frame0.T0_tool4_details'
+                ][0])
+            except (IndexError, ValueError):
+                details = []
 
-    def get_ellipses(self, sigma_cut=0.6, prob_cut=0.5):
-        ellipses = {'white': [], 'red': [], 'brown': [], 'dark': []}
-
-        if not hasattr(self, 'subject_data'):
-            print("Please load the subject data using load_subject_data!")
-
-        for key in ['white', 'red', 'brown', 'dark']:
-            extracts = filter(lambda d: (len(d[f'{key}_clusters']['x']) > 0),
-                              self.JSON_data)
-            extracts = filter(lambda d: (max(d[f'{key}_clusters']['sigma'])
-                                         < sigma_cut),
-                              extracts)
-            best_ids = np.asarray([x['subject_id'] for x in extracts])
-
-            for i, sub in enumerate(tqdm.tqdm(best_ids,
-                                              desc=f'{key} vortices')):
-                ellipses_i = self.get_ellipse_subject(sub, key,
-                                                      sigma_cut=sigma_cut,
-                                                      prob_cut=prob_cut)
-                ellipses[key].extend(ellipses_i)
-
-            ellipses[key] = np.asarray(ellipses[key])
-
-        return ellipses
-
-    def get_ellipse_subject(self, sub, key, sigma_cut=0.6, prob_cut=0.8):
-        if not hasattr(self, 'subject_data'):
-            print("Please load the subject data using load_subject_data!")
-
-        datai = next(
-            filter(lambda d: d['subject_id'] == sub, self.JSON_data))
-        inds = np.where(np.asarray(
-            datai[f'{key}_clusters']['sigma']) < sigma_cut)[0]
-
-        lon, lat, PJ = self.subject_data.get_meta(sub)
+        colorID = {'0': 'white', '1': 'red', '2': 'brown'}
+        lon, lat, PJ = self.subject_data.get_meta(subject)
 
         lat = lat_pg(lat)
 
-        x0 = np.asarray(datai[f'{key}_clusters']['x'])[inds]
-        y0 = np.asarray(datai[f'{key}_clusters']['y'])[inds]
+        x0 = np.asarray(clust_data['x'])
+        y0 = np.asarray(clust_data['y'])
+        w = np.asarray(clust_data['rx'])
+        h = np.asarray(clust_data['ry'])
+        a = np.asarray(clust_data['angle'])
 
-        w = np.asarray(datai[f'{key}_clusters']['rx'])[inds]
-        h = np.asarray(datai[f'{key}_clusters']['ry'])[inds]
-        a = np.asarray(datai[f'{key}_clusters']['angle'])[inds]
-
-        sigma = np.asarray(datai[f'{key}_clusters']['sigma'])[inds]
+        sigma = np.asarray(clust_data['sigma'])
 
         ellipses = []
         for i in range(len(x0)):
+            ext_inds = np.where(np.asarray(clust_data['labels']) == i)[0]
 
-            ext_inds = np.where(np.asarray(
-                datai[f'{key}_clusters']['labels']) == inds[i])[0]
-            ext_x0 = np.asarray(
-                datai[f'{key}_extracts']['x'])[ext_inds]
-            ext_y0 = np.asarray(
-                datai[f'{key}_extracts']['y'])[ext_inds]
-            ext_w = np.asarray(
-                datai[f'{key}_extracts']['rx'])[ext_inds]
-            ext_h = np.asarray(
-                datai[f'{key}_extracts']['ry'])[ext_inds]
-            ext_a = np.asarray(
-                datai[f'{key}_extracts']['angle'])[ext_inds]
+            ext_x0 = np.asarray(ext_data['x'])[ext_inds]
+            ext_y0 = np.asarray(ext_data['y'])[ext_inds]
+            ext_w = np.asarray(ext_data['rx'])[ext_inds]
+            ext_h = np.asarray(ext_data['ry'])[ext_inds]
+            ext_a = np.asarray(ext_data['angle'])[ext_inds]
+
+            if key == 'multi-color':
+                ext_details = np.asarray(details)[ext_inds]
 
             pari = np.asarray([x0[i], y0[i], w[i], h[i], a[i]])
 
             elli = ClusterVortex(pari, sigma[i], lon, lat)
 
-            elli.subject_id = sub
+            elli.subject_id = subject
+
+            if key == 'multi-color':
+                assert len(ext_details) == len(ext_x0), \
+                    f"Extracts does not match details for multi-color: {ext_x0}  {details}"
 
             extracts = []
             for j in range(len(ext_x0)):
-                par_ext = np.asarray([ext_x0[j], ext_y0[j], ext_w[j],
-                                      ext_h[j], ext_a[j]])
+                par_ext = np.asarray([ext_x0[j], ext_y0[j], ext_w[j], ext_h[j], ext_a[j]])
                 # set a dummy probability now and we will calculate
                 # it later using the IoU metric
-                ext_ellipse = ExtractVortex(par_ext, 1.,
-                                            lon, lat)
-                ext_ellipse.subject_id = sub
+                ext_ellipse = ExtractVortex(par_ext, 1., lon, lat)
+                ext_ellipse.subject_id = subject
                 ext_ellipse.perijove = PJ
                 ext_ellipse.color = key
 
@@ -220,20 +203,67 @@ class Aggregator:
 
                 ext_ellipse.probability = 1. - prob
 
+                if key == 'multi-color':
+                    center_color = list(ext_details[j][0].keys())[0]
+                    edge_color = list(ext_details[j][1].keys())[0]
+
+                    if center_color != edge_color:
+                        ext_ellipse.color = f'{colorID[center_color]}-{colorID[edge_color]}'
+                    else:
+                        ext_ellipse.color = colorID[center_color]
+
                 extracts.append(ext_ellipse)
+
+            if key == 'multi-color':
+                colors = [ext.color for ext in extracts]
+                unique_colors, counts = np.unique(colors, return_counts=True)
+
+                color = unique_colors[np.argmax(counts)]
+            else:
+                color = key
 
             elli.extracts = extracts
             elli.perijove = PJ
-            elli.color = key
+            elli.color = color
 
             ellipses.append(elli)
 
         return ellipses
 
-    def plot_subject(self, subject, ax=None,
-                     keys=['dark', 'red', 'white', 'brown'], sigmacut=None):
+    def get_ellipses(self, gamma_cut=0.6):
+        ellipses = []
 
-        colors = {'dark': 'k', 'red': 'r', 'white': 'white', 'brown': 'brown'}
+        if not hasattr(self, 'subject_data'):
+            print("Please load the subject data using load_subject_data!")
+
+        for i, sub in enumerate(tqdm.tqdm(self.subjects,
+                                          desc='Finding vortices', ascii=True)):
+            ellipses_i = self.get_ellipse_subject(sub, gamma_cut=gamma_cut)
+            ellipses.extend(ellipses_i)
+
+        return np.asarray(ellipses)
+
+    def get_ellipse_subject(self, sub, gamma_cut):
+        if not hasattr(self, 'subject_data'):
+            print("Please load the subject data using load_subject_data!")
+
+        if not hasattr(self, 'subject_list'):
+            self.subject_list = np.asarray([d.subject_id for d in self.ellipses])
+
+        if not hasattr(self, 'ellipse_confidence'):
+            self.ellipse_confidence = np.asarray([d.confidence() for d in self.ellipses])
+
+        ellipses = self.ellipses[(self.subject_list == sub) & (self.ellipse_confidence > gamma_cut)]
+
+        return ellipses
+
+    def plot_subject(self, subject, ax=None,
+                     keys=['dark', 'red', 'white', 'brown', 'multi_color'], gamma_cut=0.6):
+
+        colors = {'dark': 'k', 'red': 'r', 'white': 'white', 'brown': 'brown',
+                  'red-brown': 'chocolate', 'red-white': 'mistyrose',
+                  'brown-red': 'firebrick', 'brown-white': 'rosybrown',
+                  'white-red': 'salmon', 'white-brown': 'peru'}
 
         if ax is None:
             fig, ax = plt.subplots(1, 1, dpi=150)
@@ -243,44 +273,28 @@ class Aggregator:
         img = get_subject_image(subject)
         ax.imshow(img)
 
-        datai = next(
-            filter(lambda d: d['subject_id'] == subject, self.JSON_data))
+        ellipses = self.get_ellipse_subject(subject, gamma_cut)
 
-        for key in keys:
-            exti = datai[f'{key}_extracts']
-            clusti = datai[f'{key}_clusters']
+        for ellipse in ellipses:
+            try:
+                plus_sigma, minus_sigma = get_sigma_shape(ellipse.ellipse_params, ellipse.sigma)
+                avg_minus = params_to_shape(minus_sigma)
+                avg_plus = params_to_shape(plus_sigma)
 
-            for vals in zip(clusti['x'], clusti['y'], clusti['rx'],
-                            clusti['ry'], clusti['angle'], clusti['sigma']):
-                params = vals[:-1]
+                x_m, y_m = avg_minus.exterior.xy
+                x_p, y_p = avg_plus.exterior.xy
 
-                if sigmacut is not None:
-                    if vals[-1] > sigmacut:
-                        continue
+                ax.fill(
+                    np.append(x_p, x_m[::-1]),
+                    np.append(y_p, y_m[::-1]),
+                    color=colors[ellipse.color], alpha=0.2)
+            except ValueError:
+                pass
+            ax.plot(*ellipse.get_points().T, '-', color=colors[ellipse.color], linewidth=1)
 
-                ellr = params_to_shape(params)
-
-                try:
-                    plus_sigma, minus_sigma = get_sigma_shape(params, vals[-1])
-                    avg_minus = params_to_shape(minus_sigma)
-                    avg_plus = params_to_shape(plus_sigma)
-
-                    x_m, y_m = avg_minus.exterior.xy
-                    x_p, y_p = avg_plus.exterior.xy
-
-                    ax.fill(np.append(
-                        x_p, x_m[::-1]), np.append(y_p, y_m[::-1]),
-                        color=colors[key], alpha=0.2)
-                except ValueError:
-                    pass
-                ax.plot(*ellr.exterior.xy, '-', color=colors[key], linewidth=1)
-
-            for vals in zip(exti['x'], exti['y'], exti['rx'], exti['ry'],
-                            exti['angle']):
-                ellr = params_to_shape(vals)
-
-                ax.plot(*ellr.exterior.xy, '--',
-                        color=colors[key], linewidth=0.35)
+            for ext in ellipse.extracts:
+                ax.plot(*ext.get_points().T, '--',
+                        color=colors[ext.color], linewidth=0.35)
 
         ax.set_xlim((0, 384))
         ax.set_ylim((384, 0))

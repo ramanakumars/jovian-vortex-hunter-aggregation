@@ -71,7 +71,7 @@ class Vortices:
         # the parameter data table
         multi_dim_data = []
         vortices = []
-        for vort in tqdm.tqdm(vortex_dict):
+        for vort in tqdm.tqdm(vortex_dict, desc='Loading vortices', ascii=True):
             if 'subject_ids' in vort.keys():
                 ell = MultiSubjectVortex.from_dict(vort)
                 ell.set_color()
@@ -91,15 +91,17 @@ class Vortices:
         self.vort_params = np.asarray(multi_dim_data)
 
     def plot_hist_sizes(self, bin_width=250):
-        fig, axs = plt.subplots(2, 2, dpi=150, sharex=True)
+        fig, axs = plt.subplots(2, 5, dpi=150, figsize=(8, 4), sharex=True)
         bins = np.arange(0, 6000, bin_width)
 
-        colors = {'white': '#eee', 'red': 'red',
-                  'brown': 'brown', 'dark': 'grey'}
-        for i, key in enumerate(['white', 'red', 'brown', 'dark']):
+        colors = {'dark': '#ccc', 'red': 'r', 'white': 'white', 'brown': 'brown',
+                  'red-brown': 'chocolate', 'red-white': 'mistyrose',
+                  'brown-red': 'firebrick', 'brown-white': 'rosybrown',
+                  'white-red': 'salmon', 'white-brown': 'peru'}
+        for i, key in enumerate(colors.keys()):
             vortex_sub = list(filter(lambda e: e.color == key, self.vortices))
 
-            axi = axs[i // 2, i % 2]
+            axi = axs[i // 5, i % 5]
 
             axi.hist([ell.sx / 1.e3 for ell in vortex_sub],
                      bins=bins, color=colors[key])
@@ -111,15 +113,17 @@ class Vortices:
         plt.show()
 
     def plot_hist_aspect_ratio(self, nbins=20):
-        fig, axs = plt.subplots(2, 2, dpi=150, sharex=True)
+        fig, axs = plt.subplots(2, 5, figsize=(8, 4), dpi=150, sharex=True)
         bins = np.linspace(1, 3, nbins)
 
-        colors = {'white': 'white', 'red': 'red',
-                  'brown': 'brown', 'dark': 'grey'}
-        for i, key in enumerate(['white', 'red', 'brown', 'dark']):
+        colors = {'dark': '#ccc', 'red': 'r', 'white': 'white', 'brown': 'brown',
+                  'red-brown': 'chocolate', 'red-white': 'mistyrose',
+                  'brown-red': 'firebrick', 'brown-white': 'rosybrown',
+                  'white-red': 'salmon', 'white-brown': 'peru'}
+        for i, key in enumerate(colors.keys()):
             vortex_sub = list(filter(lambda e: e.color == key, self.vortices))
 
-            axi = axs[i // 2, i % 2]
+            axi = axs[i // 5, i % 5]
 
         #     print(np.asarray([ell.sx/ell.sy for ell in vortex_sub]))
             aspect_ratio = np.asarray([ell.sx / ell.sy for ell in vortex_sub])

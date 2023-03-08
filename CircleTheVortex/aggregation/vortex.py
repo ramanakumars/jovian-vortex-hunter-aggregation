@@ -236,6 +236,8 @@ class ClusterVortex(BaseVortex):
         self.ellipse_params = ellipse_params
         self.sigma = sigma
 
+        self.gamma = np.sqrt(1. - self.sigma**2.)
+
         self.lon0 = lon0
         self.lat0 = lat0
 
@@ -256,7 +258,7 @@ class ClusterVortex(BaseVortex):
         return self._ext_IoUs
 
     def confidence(self):
-        return np.sqrt(1. - self.sigma**2.)
+        return self.gamma
 
 
 class MultiSubjectVortex(ClusterVortex):

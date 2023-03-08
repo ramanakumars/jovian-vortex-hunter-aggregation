@@ -62,10 +62,12 @@ class Aggregator:
             JSON_data = json.load(indata)
 
         obj.ellipses = []
-        for e in tqdm.tqdm(JSON_data, desc='Getting ellipes', ascii=True):
+        for e in tqdm.tqdm(JSON_data, desc='Getting ellipses', ascii=True):
             obj.ellipses.append(ClusterVortex.from_dict(e))
 
-        obj.subjects = np.unique([d.subject_id for d in obj.JSON_data])
+        obj.ellipses = np.asarray(obj.ellipses)
+
+        obj.subjects = np.unique([d.subject_id for d in obj.ellipses])
 
         return obj
 
@@ -99,6 +101,8 @@ class Aggregator:
             multi_color_ells = self.get_ellipse_data(subject, 'multi-color', datasub)
 
             self.ellipses.extend([*dark_ells, *white_ells, *red_ells, *brown_ells, *multi_color_ells])
+
+        self.ellipses = np.asarray(self.ellipses)
 
     def get_ellipse_data(self, subject, key, data=None):
         '''
@@ -233,7 +237,7 @@ class Aggregator:
             print("Please load the subject data using load_subject_data!")
 
         for i, sub in enumerate(tqdm.tqdm(self.subjects,
-                                          desc='Finding vortices')):
+                                          desc='Finding vortices', ascii=True)):
             ellipses_i = self.get_ellipse_subject(sub, gamma_cut=gamma_cut)
             ellipses.extend(ellipses_i)
 
@@ -243,8 +247,13 @@ class Aggregator:
         if not hasattr(self, 'subject_data'):
             print("Please load the subject data using load_subject_data!")
 
-        ellipses = list(
-            filter(lambda d: (d.subject_id == sub) & (d.confidence() > gamma_cut), self.ellipses))
+        if not hasattr(self, 'subject_list'):
+            self.subject_list = np.asarray([d.subject_id for d in self.ellipses])
+
+        if not hasattr(self, 'ellipse_confidence'):
+            self.ellipse_confidence = np.asarray([d.confidence() for d in self.ellipses])
+
+        ellipses = self.ellipses[(self.subject_list == sub) & (self.ellipse_confidence > gamma_cut)]
 
         return ellipses
 

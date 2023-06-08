@@ -3,13 +3,14 @@ from astropy.io import ascii
 import matplotlib.pyplot as plt
 import ast
 import json
+import spiceypy as spice
+import os
 import tqdm
 from panoptes_client import Subject
 from skimage import io
 from .shape_utils import get_sigma_shape, params_to_shape, IoU_metric
 from .vortex import ExtractVortex, ClusterVortex
 from .subjects import SubjectLoader
-from .utils import lat_pg
 
 
 class NpEncoder(json.JSONEncoder):
@@ -47,6 +48,11 @@ class Aggregator:
             return
 
         self.data = ascii.read(reduction_data, format='csv')
+
+        # furnish the spice kernels for converting to SIII coords
+        kernel_path = os.path.dirname(os.path.abspath(__file__))
+        spice.furnsh(os.path.join(kernel_path, 'jup380s.bsp'))
+        spice.furnsh(os.path.join(kernel_path, 'pck00010.tpc'))
 
         sub_ids = np.asarray(self.data['subject_id'])
         self.subjects = np.unique(sub_ids)
@@ -155,7 +161,11 @@ class Aggregator:
         colorID = {'0': 'white', '1': 'red', '2': 'brown'}
         lon, lat, PJ = self.subject_data.get_meta(subject)
 
-        lat = lat_pg(lat)
+        re, rp, _ = spice.bodvar(599, 'RADII', 3)
+        f = (re - rp) / re
+
+        # convert from the latitudinal coordinate to SIII lon/lat
+        lon, lat, _ = np.degrees(spice.recpgr('JUPITER', spice.srfrec(599, *np.radians([lon, lat])), re, f))
 
         x0 = np.asarray(clust_data['x'])
         y0 = np.asarray(clust_data['y'])

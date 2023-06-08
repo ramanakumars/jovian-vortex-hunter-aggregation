@@ -37,7 +37,7 @@ def cluster_vortices(ellipses, verbose=False):
                                           ellipse_queue[j].convert_to_lonlat(),
                                           reshape=False)
 
-            delete_mask = np.where(IoUs > 0.1)[0]
+            delete_mask = np.where(IoUs > 0.02)[0]
 
             # check the IoUs
             if IoUs[1:].sum() == 0:

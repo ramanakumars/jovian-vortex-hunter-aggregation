@@ -57,7 +57,7 @@ class ZonalWind:
 
 
 class Vortices:
-    def __init__(self, vortex_data, aggregator, zonal_wind):
+    def __init__(self, vortex_data, aggregator, zonal_wind, extract_count = 4, threshold = 0.7):
         self.aggregator = aggregator
         self.zonal_wind = zonal_wind
 
@@ -75,7 +75,7 @@ class Vortices:
             if 'subject_ids' in vort.keys():
                 ell = MultiSubjectVortex.from_dict(vort)
                 ell.set_color()
-            if (len(ell.extracts) > 2) & (ell.confidence() > 0.6):
+            if (len(ell.extracts) > extract_count) & (ell.confidence() > threshold):
                 lat = ell.get_center_lonlat()[1]
                 coriolis_beta = 2. * (1.76e-4) * np.cos(np.radians(lat)) / rp
                 rowi = [zonal_wind.u_vs_lat(lat) / 100,

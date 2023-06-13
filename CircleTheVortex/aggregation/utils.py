@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import spiceypy as spice
+import os
 
 
 flat = 0.06487  # flattening parameter
@@ -66,7 +68,7 @@ def pixel_to_lonlat(x, y, lon0, lat0, x0=192, y0=192):
     dlat = np.degrees(dy * (pixscale / rlt))
     dlon = np.degrees(dx * (pixscale / rln))
 
-    return lon0 + dlon, lat0 + dlat
+    return lon0 - dlon, lat0 + dlat
 
 
 def lonlat_to_pixel(lon, lat, lon0, lat0, x0=192, y0=192):
@@ -82,7 +84,7 @@ def lonlat_to_pixel(lon, lat, lon0, lat0, x0=192, y0=192):
 
     # difference between center and requested position
     dlat = lat0 - lat
-    dlon = lon - lon0
+    dlon = lon0 - lon
 
     # now in pixel coordinates
     dy = np.radians(dlat) / (pixscale / rlt)
@@ -213,3 +215,51 @@ def plot_ellipse(ell):
     plt.tight_layout()
     plt.show()
     plt.close(fig)
+
+
+def convert_to_pc(lonlat):
+    # furnish the spice kernels for converting to SIII coords
+    if not spice.bodfnd(599, 'RADII'):
+        kernel_path = os.path.dirname(os.path.abspath(__file__))
+        spice.furnsh(os.path.join(kernel_path, 'jup380s.bsp'))
+        spice.furnsh(os.path.join(kernel_path, 'pck00010.tpc'))
+
+    re, rp, _ = spice.bodvar(599, 'RADII', 3)
+    f = (re - rp) / re
+
+    # convert from the latitudinal coordinate to SIII lon/lat
+    lonlat = np.array(lonlat)
+
+    if len(lonlat.shape) < 2:
+        lon, lat = np.degrees(spice.reclat(spice.pgrrec('JUPITER', *np.radians(lonlat), 0, re, f))[1:])
+        out = [lon, lat]
+    else:
+        out = np.zeros_like(lonlat)
+        for i, (lon, lat) in enumerate(np.radians(lonlat)):
+            out[i, :] = np.degrees(spice.reclat(spice.pgrrec('JUPITER', lon, lat, 0, re, f))[1:])
+
+    return out
+
+
+def convert_to_pg(lonlat):
+    # furnish the spice kernels for converting to SIII coords
+    if not spice.bodfnd(599, 'RADII'):
+        kernel_path = os.path.dirname(os.path.abspath(__file__))
+        spice.furnsh(os.path.join(kernel_path, 'jup380s.bsp'))
+        spice.furnsh(os.path.join(kernel_path, 'pck00010.tpc'))
+
+    re, rp, _ = spice.bodvar(599, 'RADII', 3)
+    f = (re - rp) / re
+
+    lonlat = np.array(lonlat)
+
+    if len(lonlat.shape) < 2:
+        # convert from the latitudinal coordinate to SIII lon/lat
+        lon, lat, _ = np.degrees(spice.recpgr('JUPITER', spice.srfrec(599, *np.radians(lonlat)), re, f))
+        return [lon, lat]
+    else:
+        out = np.zeros_like(lonlat)
+        for i, (lon, lat) in enumerate(np.radians(lonlat)):
+            out[i, :] = np.degrees(spice.recpgr('JUPITER', spice.srfrec(599, *np.radians([lon, lat])), re, f))[:-1]
+
+        return out

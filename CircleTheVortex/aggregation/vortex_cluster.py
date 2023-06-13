@@ -31,16 +31,27 @@ def cluster_vortices(ellipses, verbose=False):
             IoUs = np.zeros(nellipses)
             IoUs[0] = 1  # IoU wrt itself
 
+            elli_points = elli.get_points()
+
             for j in range(1, nellipses):
+                ellj = ellipse_queue[j]
+
+                if np.abs(elli.lat0 - ellj.lat0) > 20:
+                    continue
+
+                ellj_x, ellj_y = lonlat_to_pixel(*ellipse_queue[j].convert_to_lonlat().T,
+                                                 elli.lon0, elli.lat0)
+                ellj_points = np.dstack([ellj_x, ellj_y])[0, :]
+
                 # get the IoU between the ellipses in lon/lat space
-                IoUs[j] = 1. - IoU_metric(elli.convert_to_lonlat(),
-                                          ellipse_queue[j].convert_to_lonlat(),
+                IoUs[j] = 1. - IoU_metric(elli_points,
+                                          ellj_points,
                                           reshape=False)
 
-            delete_mask = np.where(IoUs > 0.02)[0]
+            delete_mask = np.where(IoUs > 0.05)[0]
 
             # check the IoUs
-            if IoUs[1:].sum() == 0:
+            if len(delete_mask) == 1:
                 # if there are no overlapping vortices
                 # then we add this to the lone vortex bin
                 lone_ellipses.append(elli)

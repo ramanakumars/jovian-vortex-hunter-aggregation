@@ -260,6 +260,6 @@ def convert_to_pg(lonlat):
     else:
         out = np.zeros_like(lonlat)
         for i, (lon, lat) in enumerate(np.radians(lonlat)):
-            out[i, :] = np.degrees(spice.recpgr('JUPITER', spice.srfrec(599, *np.radians([lon, lat])), re, f))[:-1]
+            out[i, :] = np.degrees(spice.recpgr('JUPITER', spice.srfrec(599, lon, lat), re, f))[:-1]
 
         return out

@@ -107,6 +107,10 @@ for PJ in range(PJmin, PJmax + 1):
 
     pbar.update(1)
 
+    with open(f'reductions/PJ{PJ}.json', 'w') as outfile:
+        json.dump([e.as_dict() for e in avg_ellipses if e.perijove == PJ], outfile,
+                  cls=NpEncoder)
+
 # save out the data
 with open('reductions/vortices.json', 'w') as outfile:
     json.dump([e.as_dict() for e in avg_ellipses], outfile,

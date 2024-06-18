@@ -2,19 +2,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tqdm
 import json
+from astropy.io import ascii
 from .vortex import MultiSubjectVortex
 from scipy.interpolate import interp1d
 from aggregation.utils import re, rp
 
 
 class ZonalWind:
-    def __init__(self, wind_data, smooth_du=20, smooth_dvort=40, plot=False):
+    def __init__(self, wind_data, smooth_u=15, smooth_du=20, smooth_dvort=40, plot=False):
         # load the wind data
-        ulat_dat = np.loadtxt(wind_data, skiprows=19)
+        ulat_dat = ascii.read(wind_data)
 
         # get the latitude and wind values
-        lat = self.lat = ulat_dat[:, 0]
-        self.u = ulat_dat[:, 1]
+        lat = self.lat = ulat_dat['lat'][:]
+        self.u_orig = ulat_dat['v_eastward'][:]
+
+        self.u = np.convolve(self.u_orig, np.ones(smooth_u) / smooth_u, mode='same')
 
         # get the shape factors for the ellipsoid
         rln = re / np.sqrt(1. + ((rp / re) * np.tan(np.radians(lat)))**2.)
@@ -38,8 +41,7 @@ class ZonalWind:
 
         # save these as functions that we can call later
         # cubic works well for the u_lat
-        self.u_vs_lat = interp1d(
-            ulat_dat[:, 0], ulat_dat[:, 1], kind='cubic', bounds_error=False)
+        self.u_vs_lat = interp1d(self.lat, self.u, kind='cubic', bounds_error=False)
         # but the other two are too noisy so we'll use linear
         self.du_vs_lat = interp1d(lat, dudy, kind='linear', bounds_error=False)
         self.uyy_vs_lat = interp1d(lat, uyy, kind='linear', bounds_error=False)
@@ -57,8 +59,7 @@ class ZonalWind:
 
 
 class Vortices:
-    def __init__(self, vortex_data, aggregator, zonal_wind, extract_count = 4, threshold = 0.7):
-        self.aggregator = aggregator
+    def __init__(self, vortex_data, zonal_wind, extract_count=4, threshold=0.7):
         self.zonal_wind = zonal_wind
 
         # open the vortex data and parse the JSON
@@ -72,10 +73,9 @@ class Vortices:
         multi_dim_data = []
         vortices = []
         for vort in tqdm.tqdm(vortex_dict, desc='Loading vortices', ascii=True):
-            if 'subject_ids' in vort.keys():
+            if (len(vort['extracts']) > extract_count) & (np.sqrt(1 - vort['sigma']**2.) > threshold) & ('subject_ids' in vort.keys()):
                 ell = MultiSubjectVortex.from_dict(vort)
                 ell.set_color()
-            if (len(ell.extracts) > extract_count) & (ell.confidence() > threshold):
                 lat = ell.get_center_lonlat()[1]
                 coriolis_beta = 2. * (1.76e-4) * np.cos(np.radians(lat)) / rp
                 rowi = [zonal_wind.u_vs_lat(lat) / 100,

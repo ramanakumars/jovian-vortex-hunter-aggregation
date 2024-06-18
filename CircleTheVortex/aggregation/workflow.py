@@ -3,8 +3,6 @@ from astropy.io import ascii
 import matplotlib.pyplot as plt
 import ast
 import json
-import spiceypy as spice
-import os
 import tqdm
 from panoptes_client import Subject
 from skimage import io

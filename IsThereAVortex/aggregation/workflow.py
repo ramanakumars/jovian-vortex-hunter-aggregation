@@ -42,7 +42,7 @@ class Aggregator:
             count_datai = counts_data[np.where(subjects_counts == subject)[0]]
 
             try:
-                counts = count_datai['data.extracts'][0]
+                counts = count_datai['data.classifications'][0]
                 vortex_consensus = stats_datai['data.0'][0] / counts
                 turbulence_consensus = stats_datai['data.1'][0] / counts
                 cloudbands_consensus = stats_datai['data.2'][0] / counts

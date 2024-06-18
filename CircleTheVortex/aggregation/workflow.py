@@ -7,9 +7,9 @@ import tqdm
 from panoptes_client import Subject
 from skimage import io
 from .shape_utils import get_sigma_shape, params_to_shape, IoU_metric
+from .utils import convert_to_pg
 from .vortex import ExtractVortex, ClusterVortex
 from .subjects import SubjectLoader
-from .utils import lat_pg
 
 
 class NpEncoder(json.JSONEncoder):
@@ -155,7 +155,7 @@ class Aggregator:
         colorID = {'0': 'white', '1': 'red', '2': 'brown'}
         lon, lat, PJ = self.subject_data.get_meta(subject)
 
-        lat = lat_pg(lat)
+        lon, lat = convert_to_pg([lon, lat])
 
         x0 = np.asarray(clust_data['x'])
         y0 = np.asarray(clust_data['y'])

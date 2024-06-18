@@ -2,6 +2,13 @@ import numpy as np
 import scipy.optimize
 from shapely.geometry import Point, Polygon
 from shapely import affinity
+from functools import lru_cache
+
+
+def tupleize(func):
+    def wrapper(params):
+        return func(tuple(params))
+    return wrapper
 
 
 def scale_shape(params, gamma):
@@ -46,6 +53,8 @@ def get_sigma_shape(params, sigma):
     return plus_sigma, minus_sigma
 
 
+@tupleize
+@lru_cache(maxsize=100)
 def params_to_shape(params):
     '''
         Converts the parameter list for an ellipse

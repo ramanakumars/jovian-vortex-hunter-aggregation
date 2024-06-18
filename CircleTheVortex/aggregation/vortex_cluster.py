@@ -15,6 +15,9 @@ def cluster_vortices(ellipses, verbose=False):
 
     # make a copy of the ellipses
     ellipse_queue = np.array(ellipses)
+    ellipse_sizes = [ell.sx for ell in ellipse_queue]
+    # sort by the largest ellipses so we can get better IoU
+    ellipse_queue = ellipses[np.argsort(ellipse_sizes)[::-1]]
 
     lone_ellipses = []
     ellipse_groups = []
@@ -31,16 +34,30 @@ def cluster_vortices(ellipses, verbose=False):
             IoUs = np.zeros(nellipses)
             IoUs[0] = 1  # IoU wrt itself
 
+            elli_points = elli.get_points()
+            elli_center = elli.get_center_lonlat()
+
             for j in range(1, nellipses):
+                ellj = ellipse_queue[j]
+
+                ellj_center = ellj.get_center_lonlat()
+
+                if np.linalg.norm(np.asarray(elli_center) - np.asarray(ellj_center)) > 20:
+                    continue
+
+                ellj_x, ellj_y = lonlat_to_pixel(*ellipse_queue[j].convert_to_lonlat().T,
+                                                 elli.lon0, elli.lat0, elli.x0, elli.y0)
+                ellj_points = np.dstack([ellj_x, ellj_y])[0, :]
+
                 # get the IoU between the ellipses in lon/lat space
-                IoUs[j] = 1. - IoU_metric(elli.convert_to_lonlat(),
-                                          ellipse_queue[j].convert_to_lonlat(),
+                IoUs[j] = 1. - IoU_metric(elli_points,
+                                          ellj_points,
                                           reshape=False)
 
-            delete_mask = np.where(IoUs > 0.1)[0]
+            delete_mask = np.where(IoUs > 0.05)[0]
 
             # check the IoUs
-            if IoUs[1:].sum() == 0:
+            if len(delete_mask) == 1:
                 # if there are no overlapping vortices
                 # then we add this to the lone vortex bin
                 lone_ellipses.append(elli)
@@ -116,12 +133,11 @@ def average_vortex_cluster(ellipses, prob_cut=0.5):
                                      x0=0, y0=0)
 
     avg_ellipse.extracts = new_ells
-    avg_ellipse.subject_ids = np.unique([
-        ell.subject_id for ell in new_ells]).tolist()
+    avg_ellipse.subject_ids = np.unique([ell.subject_id for ell in new_ells]).tolist()
 
     avg_ellipse.set_color()
 
-    assert len(np.unique([ell.perijove for ell in new_ells])) == 1,\
+    assert len(np.unique([ell.perijove for ell in new_ells])) == 1, \
         "All the ellipses must belong to the same perijove!"
     avg_ellipse.perijove = new_ells[0].perijove
 

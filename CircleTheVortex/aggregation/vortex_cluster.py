@@ -1,4 +1,4 @@
-from .utils import lonlat_to_pixel
+from .utils import lonlat_to_pixel, pixel_to_lonlat
 from .shape_utils import average_shape_IoU, IoU_metric
 from .vortex import MultiSubjectVortex
 import numpy as np
@@ -35,17 +35,14 @@ def cluster_vortices(ellipses, verbose=False):
             IoUs[0] = 1  # IoU wrt itself
 
             elli_points = elli.get_points()
-            elli_center = elli.get_center_lonlat()
+            # elli_center = elli.get_center_lonlat()
 
             for j in range(1, nellipses):
                 ellj = ellipse_queue[j]
 
-                ellj_center = ellj.get_center_lonlat()
+                # ellj_center = ellj.get_center_lonlat()
 
-                if np.linalg.norm(np.asarray(elli_center) - np.asarray(ellj_center)) > 20:
-                    continue
-
-                ellj_x, ellj_y = lonlat_to_pixel(*ellipse_queue[j].convert_to_lonlat().T,
+                ellj_x, ellj_y = lonlat_to_pixel(*ellj.convert_to_lonlat().T,
                                                  elli.lon0, elli.lat0, elli.x0, elli.y0)
                 ellj_points = np.dstack([ellj_x, ellj_y])[0, :]
 
@@ -119,26 +116,29 @@ def average_vortex_cluster(ellipses, prob_cut=0.5):
         ell_new.y0 = 0
 
         if ell_new.confidence() > prob_cut:
-            new_ells.append(ell_new)
+            new_ells.append([ell, ell_new])
 
     # get the average of this cluster of ellipses
     avg_shape, sigma = average_shape_IoU(
-        [ell.ellipse_params for ell in new_ells],
-        [ell.confidence() for ell in new_ells])
+        [ell.ellipse_params for _, ell in new_ells],
+        [ell.confidence() for _, ell in new_ells])
+
+    lon0, lat0 = pixel_to_lonlat(avg_shape[0], avg_shape[1], lon0, lat0, 0, 0)
 
     # propagate this back to the lat/lon grid
     # based on the fact that (0, 0) corresponds to the
     # (lon0, lat0)
-    avg_ellipse = MultiSubjectVortex(avg_shape, sigma, lon0, lat0,
-                                     x0=0, y0=0)
+    avg_shape[0] = 0
+    avg_shape[1] = 0
+    avg_ellipse = MultiSubjectVortex(avg_shape, sigma, lon0, lat0, x0=0, y0=0)
 
-    avg_ellipse.extracts = new_ells
-    avg_ellipse.subject_ids = np.unique([ell.subject_id for ell in new_ells]).tolist()
+    avg_ellipse.extracts = [ell for ell, _ in new_ells]  # copy over the old extract for the output
+    avg_ellipse.subject_ids = np.unique([ell.subject_id for ell, _ in new_ells]).tolist()
 
     avg_ellipse.set_color()
 
-    assert len(np.unique([ell.perijove for ell in new_ells])) == 1, \
+    assert len(np.unique([ell.perijove for ell, _ in new_ells])) == 1, \
         "All the ellipses must belong to the same perijove!"
-    avg_ellipse.perijove = new_ells[0].perijove
+    avg_ellipse.perijove = new_ells[0][0].perijove
 
     return avg_ellipse

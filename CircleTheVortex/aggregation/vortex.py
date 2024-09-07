@@ -172,7 +172,6 @@ class BaseVortex:
             raise ValueError("Please assign a color label to this vortex")
 
         outdict['lon'], outdict['lat'] = self.get_center_lonlat()
-        outdict['x0'], outdict['y0'] = (self.x0, self.y0)
 
         for i, key in enumerate(['x', 'y', 'rx', 'ry', 'angle']):
             outdict[key] = self.ellipse_params[i]

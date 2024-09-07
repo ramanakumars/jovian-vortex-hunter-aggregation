@@ -133,9 +133,9 @@ def average_shape_IoU(params_list, sigma):
                                            reshape=False))**2.
                     for i in range(len(params_list))])
     # find shape that minimizes the variance in the IoU metric using bounds
-    m = scipy.optimize.shgo(
+    m = scipy.optimize.direct(
         sum_distance,
-        sampling_method='sobol',
+        locally_biased=False,
         bounds=average_bounds(params_list)
     )
     # find the 1-sigma value
